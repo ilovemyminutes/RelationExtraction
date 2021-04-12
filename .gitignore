@@ -1,3 +1,11 @@
+# Data
+results/*/*
+prediction/*
+input/data/*
+input/data/test/*
+input/data/train/*
+results/*/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
