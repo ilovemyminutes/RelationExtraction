@@ -2,6 +2,8 @@ import pickle as pickle
 import os
 import pandas as pd
 import torch
+from utils import load_pickle
+from config import Config
 
 # Dataset 구성.
 class RE_Dataset(torch.utils.data.Dataset):
@@ -43,7 +45,8 @@ def preprocessing_dataset(dataset, label_type):
 # tsv 파일을 불러옵니다.
 def load_data(dataset_dir):
     # load label_type, classes
-    with open("./input/data/label_type.pkl", "rb") as f:
+    label_path = Config.LabelType if os.path.isfile(Config.LabelType) else "../input/data/label_type.pkl"
+    with open(label_path, "rb") as f:
         label_type = pickle.load(f)
     # load dataset
     dataset = pd.read_csv(dataset_dir, delimiter="\t", header=None)
