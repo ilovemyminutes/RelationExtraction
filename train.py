@@ -1,6 +1,7 @@
 import pickle as pickle
 import os
 import pandas as pd
+from tokenizers.models import Model
 import torch
 from sklearn.metrics import accuracy_score
 from transformers import (
@@ -10,7 +11,9 @@ from transformers import (
     TrainingArguments,
     BertConfig,
 )
-from load_data import *
+from models import load_model
+from dataset import load_data
+from config import ModelType, Config
 
 # 평가를 위한 metrics function.
 def compute_metrics(pred):
@@ -23,9 +26,15 @@ def compute_metrics(pred):
     }
 
 
-def train():
+def train(
+    data_root: str=Config.Train,
+    model_type: str=ModelType.BertMultiLingual,
+    
+
+
+):
     # load model and tokenizer
-    MODEL_NAME = "bert-base-multilingual-cased"
+    load_mo
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
     # load dataset
