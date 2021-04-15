@@ -37,8 +37,10 @@ class TrainArgs:
     )
     
 @dataclass
-class TokenizerType:
-    BaseTokenizer: str='BaseTokenizer'
+class TokenizeType:
+    Base: str='Base' 
+    EM: str='EM' # Entity Marking
+
 
 @dataclass
 class ModelType:
