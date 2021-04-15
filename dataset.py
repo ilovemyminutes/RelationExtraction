@@ -8,7 +8,7 @@ from transformers import BertTokenizer, DataCollatorForLanguageModeling
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
-from config import Config, TokenizeType
+from config import Config, TokenizationType
 from utils import load_pickle
 
 
@@ -40,11 +40,12 @@ def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
     if encode_label and path != Config.Test:
         enc = LabelEncoder()
         data["label"] = data["label"].apply(lambda x: enc.transform(x))
+
     return data
 
 
-def apply_tokenization(dataset, tokenizer, method: str = TokenizeType.Base):
-    if method == TokenizeType.Base:
+def apply_tokenization(dataset, tokenizer, method: str = TokenizationType.Base):
+    if method == TokenizationType.Base:
         tokenized_dataset = tokenizer(
             dataset["relation_state"].tolist(),
             return_tensors="pt",

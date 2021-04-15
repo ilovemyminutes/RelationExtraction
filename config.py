@@ -26,7 +26,7 @@ class Config:
 
 
 @dataclass
-class TokenizeType:
+class TokenizationType:
     Base: str = "Base"
     EM: str = "EM"  # Entity Marking
 
@@ -48,3 +48,10 @@ class TrainArgs:
         logging_steps=100,
         seed=42,
     )
+
+# def train_args(type: str=TrainArgs.Base):
+#     if type == TrainArgs.Base:
+#         args = TrainArgs.Base
+#     else:
+#         raise NotImplementedError
+#     return args
