@@ -8,8 +8,22 @@ from transformers import BertTokenizer, DataCollatorForLanguageModeling
 from transformers.utils import logging
 logger = logging.get_logger(__name__)
 from config import Config
+from utils import load_pickle
 
 
+COLUMNS = ['id', 'relation_state', 'e1', 'e1_start', 'e1_end', 'e2', 'e2_start', 'e2_end', 'label']
+
+def load_data(path: str, drop_id: bool=True, encode_label: bool=True):
+    data = pd.read_csv(path, sep='\t', header=None, names=COLUMNS)
+
+    if path == Config.Test: # test data have no labels
+        data.drop('label', axis=1, inplace=True)
+    if drop_id: # drop 'id' column
+        data.drop('id', axis=1, inplace=True)
+    if encode_label and path != Config.Test: # encode label from string to integer
+        enc = LabelEncoder()
+        data['label'] = data['label'].apply(lambda x: enc.transform(x))
+    return data
 
 # Dataset 구성.
 class REDataset(Dataset):
@@ -48,18 +62,16 @@ def preprocessing_dataset(dataset, label_type):
     return out_dataset
 
 
-# tsv 파일을 불러옵니다.
-def load_data(dataset_dir):
-    # load label_type, classes
-    label_path = Config.LabelType if os.path.isfile(Config.LabelType) else "../input/data/label_type.pkl"
-    with open(label_path, "rb") as f:
-        label_type = pickle.load(f)
-    # load dataset
-    dataset = pd.read_csv(dataset_dir, delimiter="\t", header=None)
-    # preprecessing dataset
-    dataset = preprocessing_dataset(dataset, label_type)
+class LabelEncoder:
+    def __init__(self, meta_root: str=Config.Label):
+        self.encoder = load_pickle(Config.Label)
+        self.decoder = {j:i for j, i in self.encoder.items()}
 
-    return dataset
+    def transform(self, x):
+        return self.encoder[x]
+        
+    def inverse_transform(self, x):
+        return self.decoder[x]
 
 
 def load_test_dataset(dataset_dir: str=Config.Test, tokenizer=None):
