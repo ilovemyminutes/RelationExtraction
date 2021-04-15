@@ -12,5 +12,5 @@ class Config:
     LabelType: str = "./input/data/label_type.pkl" if os.path.isfile("./input/data/label_type.pkl") else "../input/data/label_type.pkl"
     Train: str = './input/data/train/train.tsv' if os.path.isfile('./input/data/train/train.tsv') else '../input/data/train/train.tsv'
     Test: str = './input/data/test/test.tsv' if os.path.isfile('./input/data/test/test.tsv') else '../input/data/test/test.tsv'
-    BERTMultiLingual: str = "bert-base-multilingual-cased"
+    BertMultiLingual: str = "bert-base-multilingual-cased"
     WikiSmall: str = './my_data/wiki_20190620_small.txt' if os.path.isfile('./input/data/test/test.tsv') else '../input/data/test/test.tsv'
