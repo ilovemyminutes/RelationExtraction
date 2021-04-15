@@ -1,5 +1,5 @@
 from transformers import BertTokenizer
-from config import TokenizationType
+from config import TokenizationType, ModelType
 
 
 def load_tokenizer(type: str = TokenizationType.Base):
@@ -12,8 +12,10 @@ def load_tokenizer(type: str = TokenizationType.Base):
     ---
     - tokenizer(BertTokenizer): 사전 학습된 tokenizer
     """
+    print('Load Tokenizer...', end='\t')
     if type == TokenizationType.Base:
-        tokenizer = BertTokenizer.from_pretrained(TokenizationType.Base)
+        tokenizer = BertTokenizer.from_pretrained(ModelType.BertMultiLingual)
     else:
         raise NotImplementedError
+    print('done!')
     return tokenizer

@@ -38,7 +38,6 @@ class ModelType:
 
 class TrainArgs:
     Base: dict = dict(
-        num_labels=Config.NumClasses,
         output_dir=Config.SavePath,
         overwrite_output_dir=True,
         num_train_epochs=10,
@@ -47,6 +46,7 @@ class TrainArgs:
         save_total_limit=2,
         logging_steps=100,
         seed=42,
+        num_labels=Config.NumClasses,
     )
 
 # def train_args(type: str=TrainArgs.Base):

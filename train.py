@@ -4,6 +4,7 @@ from sklearn.metrics import accuracy_score
 from transformers import (
     Trainer,
     TrainingArguments,
+    DataCollatorForLanguageModeling
 )
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data
@@ -30,20 +31,18 @@ def train(
     # load model and tokenizer
     model = load_model(type=model_type).to(device)
     tokenizer = load_tokenizer(type=tokenization_type)
-
     dataset = load_data(path=data_root)
     labels = dataset['label'].tolist()
     dataset = apply_tokenization(dataset=dataset, tokenizer=tokenizer, method=TokenizationType.Base)
     dataset = REDataset(tokenized_dataset=dataset, labels=labels)
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=True, mlm_probability=.15)
 
-    # 사용한 option 외에도 다양한 option들이 있습니다.
-    # https://huggingface.co/transformers/main_classes/trainer.html#trainingarguments 참고해주세요.
-
-    training_args = TrainingArguments(TrainArgs.Base)
+    training_args = TrainingArguments(**TrainArgs.Base)
     trainer = Trainer(
         model=model,  # the instantiated 🤗 Transformers model to be trained
         args=training_args,  # training arguments, defined above
         train_dataset=dataset,  # training dataset
+        data_collator=data_collator
     )
 
     # train model

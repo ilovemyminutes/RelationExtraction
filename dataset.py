@@ -45,6 +45,7 @@ def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
 
 
 def apply_tokenization(dataset, tokenizer, method: str = TokenizationType.Base):
+    print('Apply Tokenization...', end='\t')
     if method == TokenizationType.Base:
         tokenized_dataset = tokenizer(
             dataset["relation_state"].tolist(),
@@ -56,6 +57,7 @@ def apply_tokenization(dataset, tokenizer, method: str = TokenizationType.Base):
         )
     else:
         raise NotImplementedError
+    print('done!')
     return tokenized_dataset
 
 
