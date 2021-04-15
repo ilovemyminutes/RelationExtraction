@@ -60,3 +60,11 @@ def load_data(dataset_dir):
     dataset = preprocessing_dataset(dataset, label_type)
 
     return dataset
+
+
+def load_test_dataset(dataset_dir, tokenizer):
+    test_dataset = load_data(dataset_dir)
+    test_label = test_dataset["label"].values
+    # tokenizing dataset
+    tokenized_test = tokenized_dataset(test_dataset, tokenizer)
+    return tokenized_test, test_label

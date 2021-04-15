@@ -1,16 +1,18 @@
 import os
 from dataclasses import dataclass
 
+LABELTYPE = "./input/data/label_type.pkl"
+TRAIN = './input/data/train/train.tsv'
+TEST = './input/data/test/test.tsv'
 
-def __clarity(path):
-    """notebooks 디렉토리 내에서 주피터 활용시 경로가 맞지 않는 문제 해결을 위한 (임시적) 함수"""
-    DOT = '.'
-    return path if os.path.isfile(path) else DOT + path
+DOT = '.'
 
 @dataclass
 class Config:
-    LabelType: str = "./input/data/label_type.pkl" if os.path.isfile("./input/data/label_type.pkl") else "../input/data/label_type.pkl"
-    Train: str = './input/data/train/train.tsv' if os.path.isfile('./input/data/train/train.tsv') else '../input/data/train/train.tsv'
-    Test: str = './input/data/test/test.tsv' if os.path.isfile('./input/data/test/test.tsv') else '../input/data/test/test.tsv'
+    '''notebooks 디렉토리의 주피터 환경에서 아래의 configuration을 활용할 수 있도록 구성
+    DOT + SOMETHING: '../something/something' <- 디렉토리 경로를 바꿔주게 됨
+    '''
+    LabelType: str = LABELTYPE if os.path.isfile(LABELTYPE) else DOT + LABELTYPE
+    Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
+    Test: str = TEST if os.path.isfile(TEST) else TEST
     BERTMultiLingual: str = "bert-base-multilingual-cased"
-    WikiSmall: str = './my_data/wiki_20190620_small.txt' if os.path.isfile('./input/data/test/test.tsv') else '../input/data/test/test.tsv'
