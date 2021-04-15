@@ -9,4 +9,3 @@ def load_model(pretrained_type: type):
     else:
         raise NotImplementedError()
     return model
-

@@ -15,6 +15,7 @@ import numpy as np
 import argparse
 from dataset import load_test_dataset
 
+
 def inference(model, tokenized_sent, device):
     dataloader = DataLoader(tokenized_sent, batch_size=40, shuffle=False)
     model.eval()
@@ -73,5 +74,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
     main(args)
-
- 

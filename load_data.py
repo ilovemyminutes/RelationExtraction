@@ -45,7 +45,11 @@ def preprocessing_dataset(dataset, label_type):
 # tsv 파일을 불러옵니다.
 def load_data(dataset_dir):
     # load label_type, classes
-    label_path = Config.LabelType if os.path.isfile(Config.LabelType) else "../input/data/label_type.pkl"
+    label_path = (
+        Config.LabelType
+        if os.path.isfile(Config.LabelType)
+        else "../input/data/label_type.pkl"
+    )
     with open(label_path, "rb") as f:
         label_type = pickle.load(f)
     # load dataset
