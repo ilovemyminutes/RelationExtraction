@@ -17,4 +17,4 @@ class Config:
     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
-    BERTMultiLingual: str = "bert-base-multilingual-cased"
+    BertMultiLingual: str = "bert-base-multilingual-cased"
