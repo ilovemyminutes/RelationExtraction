@@ -13,7 +13,7 @@ import torch
 import pickle as pickle
 import numpy as np
 import argparse
-
+from dataset import load_test_dataset
 
 def inference(model, tokenized_sent, device):
     dataloader = DataLoader(tokenized_sent, batch_size=40, shuffle=False)
@@ -34,14 +34,6 @@ def inference(model, tokenized_sent, device):
         output_pred.append(result)
 
     return np.array(output_pred).flatten()
-
-
-def load_test_dataset(dataset_dir, tokenizer):
-    test_dataset = load_data(dataset_dir)
-    test_label = test_dataset["label"].values
-    # tokenizing dataset
-    tokenized_test = tokenized_dataset(test_dataset, tokenizer)
-    return tokenized_test, test_label
 
 
 def main(args):

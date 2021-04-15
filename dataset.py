@@ -73,9 +73,33 @@ class LabelEncoder:
     def inverse_transform(self, x):
         return self.decoder[x]
 
-# def load_test_dataset(dataset_dir, tokenizer):
-#     test_dataset = load_data(dataset_dir)
-#     test_label = test_dataset["label"].values
-#     # tokenizing dataset
-#     tokenized_test = tokenized_dataset(test_dataset, tokenizer)
-#     return tokenized_test, test_label
+
+def load_test_dataset(dataset_dir: str=Config.Test, tokenizer=None):
+    if tokenizer is None:
+        raise TypeError("'tokenizer' not found.")
+    test_dataset = load_data(dataset_dir)
+    test_label = test_dataset["label"].values
+    # tokenizing dataset
+    tokenized_test = tokenize_dataset(test_dataset, tokenizer)
+    return tokenized_test, test_label
+
+
+# bert input을 위한 tokenizing.
+# tip! 다양한 종류의 tokenizer와 special token들을 활용하는 것으로도 새로운 시도를 해볼 수 있습니다.
+# baseline code에서는 2가지 부분을 활용했습니다.
+def tokenize_dataset(dataset, tokenizer):
+    concat_entity = []
+    for e01, e02 in zip(dataset["entity_01"], dataset["entity_02"]):
+        temp = ""
+        temp = e01 + "[SEP]" + e02
+        concat_entity.append(temp)
+    tokenized_sentences = tokenizer(
+        concat_entity,
+        list(dataset["sentence"]),
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=100,
+        add_special_tokens=True,
+    )
+    return tokenized_sentences
