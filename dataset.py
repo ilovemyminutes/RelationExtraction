@@ -12,7 +12,7 @@ from config import Config
 
 
 # Dataset 구성.
-class RE_Dataset(Dataset):
+class REDataset(Dataset):
     def __init__(self, tokenized_dataset, labels):
         self.tokenized_dataset = tokenized_dataset
         self.labels = labels
@@ -60,45 +60,3 @@ def load_data(dataset_dir):
     dataset = preprocessing_dataset(dataset, label_type)
 
     return dataset
-
-
-# bert input을 위한 tokenizing.
-# tip! 다양한 종류의 tokenizer와 special token들을 활용하는 것으로도 새로운 시도를 해볼 수 있습니다.
-# baseline code에서는 2가지 부분을 활용했습니다.
-def tokenized_dataset(dataset, tokenizer):
-    concat_entity = []
-    for e01, e02 in zip(dataset["entity_01"], dataset["entity_02"]):
-        temp = ""
-        temp = e01 + "[SEP]" + e02
-        concat_entity.append(temp)
-    tokenized_sentences = tokenizer(
-        concat_entity,
-        list(dataset["sentence"]),
-        return_tensors="pt",
-        padding=True,
-        truncation=True,
-        max_length=100,
-        add_special_tokens=True,
-    )
-    return tokenized_sentences
-
-
-if __name__ == '__main__':
-    tokenizer = BertTokenizer(
-    vocab_file="./samples/my_tokenizer-vocab.txt",
-    max_len=128,
-    do_lower_case=False
-    )
-
-    dataset = TextDatasetForNextSentencePrediction(
-    tokenizer=tokenizer,
-    file_path='./samples/wiki_20190620_small.txt',
-    block_size=128,
-    overwrite_cache=False,
-    short_seq_probability=0.1,
-    nsp_probability=0.5,
-    )
-
-data_collator = DataCollatorForLanguageModeling(    # [MASK] 를 씌우는 것은 저희가 구현하지 않아도 됩니다! :-)
-    tokenizer=tokenizer, mlm=True, mlm_probability=0.15
-)
