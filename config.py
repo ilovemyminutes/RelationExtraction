@@ -19,5 +19,12 @@ class Config:
     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
-    BertMultiLingual: str = "bert-base-multilingual-cased"
+    
+@dataclass
+class TokenizerType:
     BaseTokenizer: str='BaseTokenizer'
+
+@dataclass
+class ModelType:
+    BertMultiLingual: str = "bert-base-multilingual-cased"
+
