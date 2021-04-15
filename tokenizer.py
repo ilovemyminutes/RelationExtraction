@@ -2,7 +2,7 @@ from transformers import BertTokenizer
 from config import TokenizationType
 
 
-def load_tokenizer(pretrained_type: str = TokenizationType.Base):
+def load_tokenizer(type: str = TokenizationType.Base):
     """사전 학습된 tokenizer를 불러오는 함수
     Args
     ---

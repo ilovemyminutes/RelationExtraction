@@ -2,11 +2,8 @@ from tokenizer import load_tokenizer
 import torch
 from sklearn.metrics import accuracy_score
 from transformers import (
-    AutoTokenizer,
-    BertForSequenceClassification,
     Trainer,
     TrainingArguments,
-    BertConfig,
 )
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data
@@ -31,8 +28,8 @@ def train(
 ):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # load model and tokenizer
-    model = load_model(model_type=model_type).to(device)
-    tokenizer = load_tokenizer(tokenization_type=tokenization_type)
+    model = load_model(type=model_type).to(device)
+    tokenizer = load_tokenizer(type=tokenization_type)
 
     dataset = load_data(path=data_root)
     labels = dataset['label'].tolist()
