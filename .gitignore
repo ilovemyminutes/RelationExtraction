@@ -6,6 +6,7 @@ kor_text_handling.ipynb
 한국어_전처리_실습_문제.ipynb
 
 # Data
+samples/*
 results/*/*
 prediction/*
 input/data/*
