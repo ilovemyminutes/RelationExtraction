@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+from tokenizers.implementations.base_tokenizer import BaseTokenizer
+
 LABELTYPE = "./input/data/label_type.pkl"
 TRAIN = './input/data/train/train.tsv'
 TEST = './input/data/test/test.tsv'
@@ -18,3 +20,4 @@ class Config:
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     BertMultiLingual: str = "bert-base-multilingual-cased"
+    BaseTokenizer: str='BaseTokenizer'
