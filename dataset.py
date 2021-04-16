@@ -10,6 +10,18 @@ from config import Config, TokenizationType
 from utils import load_pickle
 from tokenization import load_tokenizer
 
+COLUMNS = [
+        "id",
+        "relation_state",
+        "e1",
+        "e1_start",
+        "e1_end",
+        "e2",
+        "e2_start",
+        "e2_end",
+        "label",
+    ]
+
 
 # TODO: K-Fold
 
@@ -65,32 +77,21 @@ def get_train_test_loader(
 
 
 class REDataset(Dataset):
-    COLUMNS = [
-        "id",
-        "relation_state",
-        "e1",
-        "e1_start",
-        "e1_end",
-        "e2",
-        "e2_start",
-        "e2_end",
-        "label",
-    ]
-
     def __init__(
-        self, root: str = Config.Train, tokenization_type: str = TokenizationType.Base
+        self, root: str = Config.Train, tokenization_type: str = TokenizationType.Base, device: str=Config.Device
     ):
         self.tokenizer = load_tokenizer(type=tokenization_type)
         self.enc = LabelEncoder()
         raw = self._load_raw(root)
         self.sentences = self._tokenize(raw)
         self.labels = raw["label"].tolist()
+        self.device = device
 
     def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
         sentence = {
-            key: torch.as_tensor(val[idx]) for key, val in self.sentences.items()
+            key: torch.as_tensor(val[idx]).to(self.device) for key, val in self.sentences.items()
         }
-        label = torch.as_tensor(self.labels[idx])
+        label = torch.as_tensor(self.labels[idx]).to(self.device)
         return sentence, label
 
     def __len__(self):
@@ -99,7 +100,7 @@ class REDataset(Dataset):
     def _load_raw(self, root):
         print("Load raw data...", end="\t")
         raw = pd.read_csv(root, sep="\t", header=None)
-        raw.columns = self.COLUMNS
+        raw.columns = COLUMNS
         raw = raw.drop("id", axis=1)
         raw["label"] = raw["label"].apply(lambda x: self.enc.transform(x))
         print("done!")
@@ -117,6 +118,26 @@ class REDataset(Dataset):
         )
         print("done!")
         return data_tokenized
+
+
+# for EDA mainly
+def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> Tuple[pd.DataFrame, list]:
+    data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
+
+    # test data have no labels
+    if path == Config.Test:
+        data.drop("label", axis=1, inplace=True)
+
+    # drop 'id' column
+    if drop_id:
+        data.drop("id", axis=1, inplace=True)
+
+    # encode label from string to integer
+    if encode_label:
+        enc = LabelEncoder()
+        data["label"] = data["label"].apply(lambda x: enc.transform(x))
+        
+    return data
 
 
 class LabelEncoder:
