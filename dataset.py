@@ -1,7 +1,7 @@
 import os
 import pickle
 import pandas as pd
-from typing import List
+from typing import Tuple
 from torch.utils.data import Dataset
 import torch
 from transformers.tokenization_utils import PreTrainedTokenizer
@@ -26,7 +26,7 @@ COLUMNS = [
 ]
 
 
-def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> List[pd.DataFrame, List]:
+def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> Tuple[pd.DataFrame, list]:
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -92,3 +92,9 @@ class LabelEncoder:
 
     def inverse_transform(self, x):
         return self.decoder[x]
+
+
+# for debug
+if __name__ == '__main__':
+    config_load_data = dict(path=Config.Train, drop_id= True, encode_label=True)
+    load_data(**config_load_data)
