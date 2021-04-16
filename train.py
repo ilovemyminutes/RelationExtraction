@@ -1,11 +1,14 @@
 from tqdm import tqdm
-from torch import nn, optim
-from evaluation import compute_metrics
+import numpy as np
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+import torch
+from evaluation import evaluate
 from transformers import Trainer, TrainingArguments
 from models import load_model
 from dataset import REDataset, get_train_test_loader
-from config import ModelType, Config, PreTrainedType, TokenizationType
-from optims import get_optim, get_scheduler
+from optims import get_optimizer, get_scheduler
+from criterions import get_criterion
+from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
 
 
 def train(
@@ -15,7 +18,9 @@ def train(
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     tokenization_type: str = TokenizationType.Base,
     num_classes: int = Config.NumClasses,
-    optim_type: str = 
+    loss_type: str = Loss.CE,
+    optim_type: str = Optimizer.Adam,
+    lr: float = Config.LR,
     device: str = Config.Device
 ):
     # load data
@@ -28,16 +33,47 @@ def train(
     model.train()
 
     # load object func, optimizer
-    criterion = nn.CrossEntropyLoss()
-    optim = get_optim(model, optim_type=, lr)
+    criterion = get_criterion(type=loss_type)
+    optimizer = get_optimizer(model, optim_type=, lr=lr)
     
 
     for epoch in range(epochs):
         print(f'Epoch: {epoch}')
 
+        # ACC, RECALL, PRECISION, F1
+        pred_list = []
+        true_list = []
+
+        # CE Loss
+        total_loss = 0
+        num_samples = 0
+
         for sents, labels in tqdm(train_loader, desc='Train'):
             outputs = model(**sents).logits
-            loss = cri
+            loss = criterion(outputs, labels)
+            total_loss += loss.item()
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            num_samples += len(labels)
+
+            _, preds = torch.max(outputs, dim=1)
+            preds = preds.data.cpu().numpy()
+            labels = labels.data.cpu().numpy()
+
+            pred_list.append(preds)
+            true_list.append(labels)
+        
+        pred_arr = np.hstack(pred_list)
+        true_arr = np.hstack(true_list)
+
+        # Calculate metrics
+        precision, recal, f1, _ = precision_recall_fscore_support(y_true=true_arr, y_pred=pred_arr, average='macro')
+        accuracy = accuracy_score(y_true=true_arr, y_pred=pred_arr)
+        train_loss = total_loss / num_samples
+
     
 
     training_args = TrainingArguments(**TrainArgs.Base)

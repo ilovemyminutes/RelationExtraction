@@ -4,7 +4,7 @@ from adamp import AdamP
 from config import Optimizer
 
 
-def get_optim(model: nn.Module, optim_type: str, lr: float):
+def get_optimizer(model: nn.Module, optim_type: str, lr: float):
     if optim_type == Optimizer.Adam:
         optimizer = optim.Adam(model.parameters(), lr=lr)
     elif optim_type == Optimizer.SGD:

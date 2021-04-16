@@ -27,6 +27,7 @@ class Config:
     Epochs: int = 1
     Batch32: int = 32
     Batch64: int = 64
+    LR: float = 0.001
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
