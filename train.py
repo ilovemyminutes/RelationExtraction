@@ -1,10 +1,11 @@
-from torch import nn, optim
 from tqdm import tqdm
+from torch import nn, optim
+from evaluation import compute_metrics
 from transformers import Trainer, TrainingArguments
 from models import load_model
 from dataset import REDataset, get_train_test_loader
 from config import ModelType, Config, PreTrainedType, TokenizationType
-from evaluation import compute_metrics
+from optims import get_optim, get_scheduler
 
 
 def train(
@@ -14,6 +15,7 @@ def train(
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     tokenization_type: str = TokenizationType.Base,
     num_classes: int = Config.NumClasses,
+    optim_type: str = 
     device: str = Config.Device
 ):
     # load data
@@ -27,7 +29,7 @@ def train(
 
     # load object func, optimizer
     criterion = nn.CrossEntropyLoss()
-    optim = optim()
+    optim = get_optim(model, optim_type=, lr)
     
 
     for epoch in range(epochs):

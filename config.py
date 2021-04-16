@@ -30,6 +30,18 @@ class Config:
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+@dataclass
+class Optimizer:
+    Adam: str = 'Adam'
+    AdamP: str = 'AdamP'
+    SGD: str = 'SGD'
+    Momentum: str = 'Momentum'
+    CosineScheduler: str = 'CosineScheduler'
+
+@dataclass
+class Loss:
+    CE: str = "crossentropyloss"
+    LS: str = "labelsmoothingLoss"
 
 @dataclass
 class TokenizationType:
