@@ -35,8 +35,12 @@ class TokenizationType:
 
 @dataclass
 class ModelType:
-    BertMultiLingual: str = "bert-base-multilingual-cased"
+    Base: str = 'BertModel'
+    SequenceClf: str= 'BertForSequenceClassification'
 
+@dataclass
+class PreTrainedType:
+    BertMultiLingual: str = "bert-base-multilingual-cased"
 
 class TrainArgs:
     Base: dict = dict(
