@@ -11,6 +11,8 @@ from utils import load_pickle
 from tokenization import load_tokenizer
 
 
+# TODO: K-Fold
+
 def get_train_test_loader(
     dataset: Dataset,
     batch_size: int = 64,
@@ -18,6 +20,20 @@ def get_train_test_loader(
     test_size: float = 0.2,
     shuffle: bool = True,
 ):
+    """데이터셋을 입력 받아 train, test DataLoader를 생성하는 함수
+
+    Args:
+        dataset (Dataset): 
+        batch_size (int, optional): 배치 사이즈. Defaults to 64.
+        drop_last (boot, optional): Train DataLoader의 마지막 배치를 버릴지 여부. Defaults to True.
+        test_size (float, optional): 얼만큼의 비율로 데이터를 나눌지 결정. Defaults to 0.2.
+        shuffle (bool, optional):
+            데이터 분리 과정에서 셔플을 진행할 지 여부
+            NOTE. 분리 이후 생성된 DataLoader는 shuffle 여부에 관계 없이 random iteration
+
+    Returns:
+        [type]: [description]
+    """    
     num_samples = len(dataset)
     indices = [i for i in range(num_samples)]
 
@@ -31,7 +47,10 @@ def get_train_test_loader(
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
 
-    train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=True)
+    if drop_last:
+        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=True)
+    else:
+        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=False)
     test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=batch_size, drop_last=False)
 
     return train_loader, test_loader
