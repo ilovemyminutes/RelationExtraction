@@ -1,5 +1,3 @@
-import os
-import pickle
 import pandas as pd
 from typing import Tuple
 from torch.utils.data import Dataset
@@ -34,7 +32,7 @@ class REDataset(Dataset):
         self.sentences = self._tokenize(raw)
         self.labels = raw["label"].tolist()
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
         sentence = {
             key: torch.as_tensor(val[idx]) for key, val in self.sentences.items()
         }
@@ -81,5 +79,5 @@ class LabelEncoder:
 
 # just for debug
 if __name__ == "__main__":
-    config_redataset = dict(path=Config.Train, tokenization_type=TokenizationType.Base)
+    config_redataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
     REDataset(**config_redataset)
