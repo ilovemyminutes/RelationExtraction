@@ -61,9 +61,3 @@ class TrainArgs:
         save_steps=1000,
         save_total_limit=2,
     )
-# def train_args(type: str=TrainArgs.Base):
-#     if type == TrainArgs.Base:
-#         args = TrainArgs.Base
-#     else:
-#         raise NotImplementedError
-#     return args

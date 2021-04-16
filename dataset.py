@@ -1,6 +1,7 @@
 import os
 import pickle
 import pandas as pd
+from typing import List
 from torch.utils.data import Dataset
 import torch
 from transformers.tokenization_utils import PreTrainedTokenizer
@@ -25,7 +26,7 @@ COLUMNS = [
 ]
 
 
-def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
+def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> List[pd.DataFrame, List]:
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -40,8 +41,11 @@ def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
     if encode_label and path != Config.Test:
         enc = LabelEncoder()
         data["label"] = data["label"].apply(lambda x: enc.transform(x))
+    
+    dataset = data.drop('label', axis=1)
+    labels = data['label'].tolist()
 
-    return data
+    return dataset, labels
 
 
 def apply_tokenization(dataset, tokenizer, method: str = TokenizationType.Base):

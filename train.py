@@ -8,19 +8,22 @@ from transformers import (
 )
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data
-from config import ModelType, Config, TokenizationType, TrainArgs
+from config import ModelType, Config, PreTrainedType, TokenizationType, TrainArgs
 from evaluation import compute_metrics
 
 
 
 def train(
     data_root: str=Config.Train,
-    model_type: str=ModelType.BertMultiLingual,
+    model_type: str=ModelType.SequenceClf,
+    pretrained_type: str=PreTrainedType.BertMultiLingual,
     tokenization_type: str=TokenizationType.Base,
+    num_classes: int=Config.NumClasses
 ):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # load model and tokenizer
-    model = load_model(type=model_type).to(device)
+
+    model = load_model(model_type, pretrained_type, num_classes)
+    model.to(device)
     tokenizer = load_tokenizer(type=tokenization_type)
     dataset = load_data(path=data_root)
     labels = dataset['label'].tolist()
