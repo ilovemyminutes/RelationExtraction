@@ -1,6 +1,5 @@
 import argparse
 import os
-import warnings
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -13,10 +12,9 @@ from criterions import get_criterion
 from utils import get_timestamp, set_seed
 from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
 
-warnings.filterwarnings("ignore")
-
 
 VALID_CYCLE = 100
+# TIMESTAMP = None
 
 
 def train(
@@ -99,6 +97,7 @@ def train(
             # evaluation phase
             train_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
             train_loss = total_loss / len(true_arr)
+            verbose(phase="Train", eval=train_eval, loss=train_loss)
 
             if epoch == 0:
                 wandb.log(
@@ -116,7 +115,6 @@ def train(
                     model=model, valid_loader=valid_loader, criterion=criterion
                 )
                 verbose(phase="Valid", eval=train_eval, loss=train_loss)
-                verbose(phase="Train", eval=train_eval, loss=train_loss)
 
                 if epoch == 0:
                     wandb.log(
@@ -146,11 +144,9 @@ def train(
         )
 
         if save_path and valid_eval["accuracy"] >= best_acc:
-            name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({TIMESTAMP}).pth"
+            name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({timestamp}).pth"
             best_acc = valid_eval["accuracy"]
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
-            
 
 
 def validate(model, valid_loader, criterion):
@@ -219,8 +215,8 @@ if __name__ == "__main__":
 
     # register logs to wandb
     args = parser.parse_args()
-    TIMESTAMP = get_timestamp()
-    name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+    timestamp = get_timestamp()
+    name = args.model_type + "_" + args.pretrained_type + "_" + timestamp
     run = wandb.init(project="pstage-klue", name=name, reinit=True)
     wandb.config.update(args)
 

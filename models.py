@@ -7,7 +7,7 @@ def load_model(
     model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     num_classes: int = Config.NumClasses,
-    load_state_dict: str = None
+    load_state_dict: str = None,
 ):
     print("Load Model...", end="\t")
     # make BERT configuration
@@ -26,7 +26,7 @@ def load_model(
 
     if load_state_dict is not None:
         model.load_state_dict(torch.load(load_state_dict))
-        print(f"Loaded pretrained weights from {load_state_dict}", end='\t')
+        print(f"Loaded pretrained weights from {load_state_dict}", end="\t")
 
     print("done!")
     return model

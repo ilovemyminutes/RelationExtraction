@@ -8,6 +8,7 @@ TEST = "./input/data/test/test.tsv"
 LABEL = "./input/data/label_type.pkl"
 SAVEPATH = "./saved_models"
 LOGS = "./logs"
+CKPT = "./saved_models"
 
 DOT = "."
 
@@ -31,6 +32,7 @@ class Config:
     LR: float = 0.001
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    CheckPoint: str = CKPT if os.path.isfile(CKPT) else DOT + CKPT
 
 
 @dataclass
