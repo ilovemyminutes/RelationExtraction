@@ -1,5 +1,5 @@
 import torch
-from tokenizers import load_tokenizer
+from load_tokenizer import load_tokenizer
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data
@@ -26,20 +26,21 @@ def train(
         dataset=dataset_raw, tokenizer=tokenizer, method=TokenizationType.Base
     )
     dataset = REDataset(tokenized_dataset=dataset_tokenized, labels=labels)
-    data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer, mlm=True, mlm_probability=0.15
-    )
+    # data_collator = DataCollatorForLanguageModeling(
+    #     tokenizer=tokenizer, mlm=True, mlm_probability=0.15
+    # )
 
     training_args = TrainingArguments(**TrainArgs.Base)
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
-        data_collator=data_collator,
+        # data_collator=data_collator, # TODO: Sequence Classification Task에 맞는 Data Collator를 구축
+        compute_metrics=compute_metrics
     )
-
     # train model
     trainer.train()
+    trainer.evaluate(eval_dataset=dataset)
 
 
 if __name__ == "__main__":

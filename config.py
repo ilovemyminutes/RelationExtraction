@@ -23,10 +23,10 @@ class Config:
     SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 10
-    Batch32: int=32
-    Batch64: int=64
-    Seed: int=42
+    Epochs: int = 1
+    Batch32: int = 32
+    Batch64: int = 64
+    Seed: int = 42
 
 
 @dataclass
@@ -37,12 +37,14 @@ class TokenizationType:
 
 @dataclass
 class ModelType:
-    Base: str = 'BertModel'
-    SequenceClf: str= 'BertForSequenceClassification'
+    Base: str = "BertModel"
+    SequenceClf: str = "BertForSequenceClassification"
+
 
 @dataclass
 class PreTrainedType:
     BertMultiLingual: str = "bert-base-multilingual-cased"
+
 
 class TrainArgs:
     Base: dict = dict(

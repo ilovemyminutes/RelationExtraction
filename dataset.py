@@ -94,7 +94,7 @@ class LabelEncoder:
         return self.decoder[x]
 
 
-# for debug
+# just for debug
 if __name__ == '__main__':
     config_load_data = dict(path=Config.Train, drop_id= True, encode_label=True)
     load_data(**config_load_data)
