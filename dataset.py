@@ -11,9 +11,12 @@ from transformers.utils import logging
 logger = logging.get_logger(__name__)
 from config import Config, TokenizationType
 from utils import load_pickle
+from tokenization import load_tokenizer
 
 
-COLUMNS = [
+
+class REDataset(Dataset):
+    COLUMNS = [
     "id",
     "relation_state",
     "e1",
@@ -22,64 +25,48 @@ COLUMNS = [
     "e2",
     "e2_start",
     "e2_end",
-    "label",
-]
-
-
-def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> Tuple[pd.DataFrame, list]:
-    data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
-
-    # test data have no labels
-    if path == Config.Test:
-        data.drop("label", axis=1, inplace=True)
-
-    # drop 'id' column
-    if drop_id:
-        data.drop("id", axis=1, inplace=True)
-
-    # encode label from string to integer
-    if encode_label and path != Config.Test:
-        enc = LabelEncoder()
-        data["label"] = data["label"].apply(lambda x: enc.transform(x))
-    
-    dataset = data.drop('label', axis=1)
-    labels = data['label'].tolist()
-
-    return dataset, labels
-
-
-def apply_tokenization(dataset, tokenizer, method: str = TokenizationType.Base):
-    print('Apply Tokenization...', end='\t')
-    if method == TokenizationType.Base:
-        tokenized_dataset = tokenizer(
-            dataset["relation_state"].tolist(),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=100,
-            add_special_tokens=True,
-        )
-    else:
-        raise NotImplementedError
-    print('done!')
-    return tokenized_dataset
-
-
-class REDataset(Dataset):
-    def __init__(self, tokenized_dataset, labels):
-        self.tokenized_dataset = tokenized_dataset
-        self.labels = labels
+    "label"
+    ]
+    def __init__(self, root: str=Config.Train, tokenization_type: str=TokenizationType.Base):
+        self.tokenizer = load_tokenizer(type=tokenization_type)
+        self.enc = LabelEncoder()
+        raw = self._load_raw(root)
+        self.sentences = self._tokenize(raw)
+        self.labels = raw['label'].tolist()
 
     def __getitem__(self, idx):
-        item = {
+        sentence = {
             key: torch.as_tensor(val[idx])
-            for key, val in self.tokenized_dataset.items()
+            for key, val in self.sentences.items()
         }
-        item["labels"] = torch.as_tensor(self.labels[idx])
-        return item
+        label = torch.as_tensor(self.labels[idx])
+        return sentence, label
 
     def __len__(self):
         return len(self.labels)
+    
+    def _load_raw(self, root):
+        print('Load raw data...', end='\t')
+        raw = pd.read_csv(root, sep='\t', header=None)
+        raw.columns = self.COLUMNS
+        raw = raw.drop('id', axis=1)
+        raw['label'] = raw['label'].apply(lambda x: self.enc.transform(x))
+        print('done!')
+        return raw
+
+    def _tokenize(self, data):
+        print('Apply Tokenization...', end='\t')
+        data_tokenized = self.tokenizer(
+            data["relation_state"].tolist(),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=128,
+            add_special_tokens=True,
+        )
+        print('done!')
+        return data_tokenized
+
 
 
 class LabelEncoder:
