@@ -8,6 +8,7 @@ TRAIN = "./input/data/train/train.tsv"
 TEST = "./input/data/test/test.tsv"
 LABEL = "./input/data/label_type.pkl"
 SAVEPATH = "./saved_models"
+LOGS = "./logs"
 
 DOT = "."
 
@@ -22,6 +23,7 @@ class Config:
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
+    Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
 
 
@@ -42,13 +44,15 @@ class TrainArgs:
         overwrite_output_dir=True,
         num_train_epochs=10,
         per_device_train_batch_size=32,
+        per_device_eval_batch_size=64,
+        warmup_steps=500,
+        weight_decay=0.01,
+        seed=42,
+        logging_dir=Config.Logs,
+        logging_steps=100,
         save_steps=1000,
         save_total_limit=2,
-        logging_steps=100,
-        seed=42,
-        num_labels=Config.NumClasses,
     )
-
 # def train_args(type: str=TrainArgs.Base):
 #     if type == TrainArgs.Base:
 #         args = TrainArgs.Base
