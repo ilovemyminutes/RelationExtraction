@@ -20,6 +20,7 @@ class Config:
 
     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
+    ValidSize: float = 0.2
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
@@ -31,18 +32,21 @@ class Config:
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+
 @dataclass
 class Optimizer:
-    Adam: str = 'Adam'
-    AdamP: str = 'AdamP'
-    SGD: str = 'SGD'
-    Momentum: str = 'Momentum'
-    CosineScheduler: str = 'CosineScheduler'
+    Adam: str = "Adam"
+    AdamP: str = "AdamP"
+    SGD: str = "SGD"
+    Momentum: str = "Momentum"
+    CosineScheduler: str = "CosineScheduler"
+
 
 @dataclass
 class Loss:
     CE: str = "crossentropyloss"
     LS: str = "labelsmoothingLoss"
+
 
 @dataclass
 class TokenizationType:

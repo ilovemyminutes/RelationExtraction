@@ -1,7 +1,7 @@
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 
-def evaluate(y_true, y_pred, average: str='macro') -> dict:
+def evaluate(y_true, y_pred, average: str = "macro") -> dict:
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true=y_true, y_pred=y_pred, average=average
     )

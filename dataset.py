@@ -5,38 +5,40 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
+
 logger = logging.get_logger(__name__)
 from config import Config, TokenizationType
 from utils import load_pickle
 from tokenization import load_tokenizer
 
 COLUMNS = [
-        "id",
-        "relation_state",
-        "e1",
-        "e1_start",
-        "e1_end",
-        "e2",
-        "e2_start",
-        "e2_end",
-        "label",
-    ]
+    "id",
+    "relation_state",
+    "e1",
+    "e1_start",
+    "e1_end",
+    "e2",
+    "e2_start",
+    "e2_end",
+    "label",
+]
 
 
 # TODO: K-Fold
 
+
 def get_train_test_loader(
     dataset: Dataset,
+    test_size: float = 0.2,
     train_batch_size: int = 32,
     test_batch_size: int = 512,
     drop_last: bool = True,
-    test_size: float = 0.2,
     shuffle: bool = True,
 ):
     """데이터셋을 입력 받아 train, test DataLoader를 생성하는 함수
 
     Args:
-        dataset (Dataset): 
+        dataset (Dataset):
         train_batch_size (int, optional): 학습용 DataLoader의 배치 사이즈. Defaults to 64.
         valid_batch_size (int, optional): 검증용 DataLaoder의 배치 사이즈. Defaults to 512.
         drop_last (boot, optional): Train DataLoader의 마지막 배치를 버릴지 여부. Defaults to True.
@@ -50,8 +52,8 @@ def get_train_test_loader(
         test_loader (DataLoader): 검증용 DataLoader
     """
     if test_size == 0 or test_size > 1:
-        raise ValueError('test_size should be between 0 and 1.')
-        
+        raise ValueError("test_size should be between 0 and 1.")
+
     num_samples = len(dataset)
     indices = [i for i in range(num_samples)]
 
@@ -64,21 +66,30 @@ def get_train_test_loader(
     train_indices = indices[num_test:]
     train_sampler = SubsetRandomSampler(train_indices)
     if drop_last:
-        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True)
+        train_loader = DataLoader(
+            dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True
+        )
     else:
-        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=False)
+        train_loader = DataLoader(
+            dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=False
+        )
 
     # test loader
     test_indices = indices[:num_test]
     test_sampler = SubsetRandomSampler(test_indices)
-    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=test_batch_size, drop_last=False)
+    test_loader = DataLoader(
+        dataset, sampler=test_sampler, batch_size=test_batch_size, drop_last=False
+    )
 
     return train_loader, test_loader
 
 
 class REDataset(Dataset):
     def __init__(
-        self, root: str = Config.Train, tokenization_type: str = TokenizationType.Base, device: str=Config.Device
+        self,
+        root: str = Config.Train,
+        tokenization_type: str = TokenizationType.Base,
+        device: str = Config.Device,
     ):
         self.tokenizer = load_tokenizer(type=tokenization_type)
         self.enc = LabelEncoder()
@@ -89,7 +100,8 @@ class REDataset(Dataset):
 
     def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
         sentence = {
-            key: torch.as_tensor(val[idx]).to(self.device) for key, val in self.sentences.items()
+            key: torch.as_tensor(val[idx]).to(self.device)
+            for key, val in self.sentences.items()
         }
         label = torch.as_tensor(self.labels[idx]).to(self.device)
         return sentence, label
@@ -121,7 +133,9 @@ class REDataset(Dataset):
 
 
 # for EDA mainly
-def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> Tuple[pd.DataFrame, list]:
+def load_data(
+    path: str, drop_id: bool = True, encode_label: bool = True
+) -> Tuple[pd.DataFrame, list]:
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -136,7 +150,7 @@ def load_data(path: str, drop_id: bool = True, encode_label: bool = True) -> Tup
     if encode_label:
         enc = LabelEncoder()
         data["label"] = data["label"].apply(lambda x: enc.transform(x))
-        
+
     return data
 
 

@@ -11,6 +11,7 @@ def get_criterion(type: str = Loss.CE):
         criterion = LabelSmoothingLoss(classes=Config.NumClasses)
     return criterion
 
+
 class LabelSmoothingLoss(nn.Module):
     def __init__(self, classes, smoothing=0.2, dim=-1):
         super(LabelSmoothingLoss, self).__init__()

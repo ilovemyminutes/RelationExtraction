@@ -12,9 +12,7 @@ def load_model(
     bert_config.num_labels = num_classes
 
     if model_type == ModelType.Base:
-        model = BertModel.from_pretrained(
-            pretrained_type, config=bert_config
-        )
+        model = BertModel.from_pretrained(pretrained_type, config=bert_config)
     elif model_type == ModelType.SequenceClf:
         model = BertForSequenceClassification.from_pretrained(
             pretrained_type, config=bert_config

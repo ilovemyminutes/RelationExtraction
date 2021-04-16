@@ -18,11 +18,14 @@ def train(
     data_root: str = Config.Train,
     model_type: str = ModelType.SequenceClf,
     epochs: int = 1,
+    train_batch_size: int = Config.Batch32,
+    valid_batch_size: int = 512,
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     tokenization_type: str = TokenizationType.Base,
     num_classes: int = Config.NumClasses,
     loss_type: str = Loss.CE,
     optim_type: str = Optimizer.Adam,
+    valid_size: float = Config.ValidSize,
     lr: float = Config.LR,
     lr_scheduler: str = Optimizer.CosineScheduler,
     device: str = Config.Device,
@@ -31,7 +34,12 @@ def train(
     dataset = REDataset(
         root=data_root, tokenization_type=tokenization_type, device=device
     )
-    train_loader, valid_loader = get_train_test_loader(dataset)
+    train_loader, valid_loader = get_train_test_loader(
+        dataset=dataset,
+        test_size=valid_size,
+        train_batch_size=train_batch_size,
+        test_batch_size=test_batch_size,
+    )
 
     # load model
     model = load_model(model_type, pretrained_type, num_classes)
