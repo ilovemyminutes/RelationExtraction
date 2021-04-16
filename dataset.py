@@ -15,7 +15,8 @@ from tokenization import load_tokenizer
 
 def get_train_test_loader(
     dataset: Dataset,
-    batch_size: int = 64,
+    train_batch_size: int = 32,
+    test_batch_size: int = 512,
     drop_last: bool = True,
     test_size: float = 0.2,
     shuffle: bool = True,
@@ -24,7 +25,8 @@ def get_train_test_loader(
 
     Args:
         dataset (Dataset): 
-        batch_size (int, optional): 배치 사이즈. Defaults to 64.
+        train_batch_size (int, optional): 학습용 DataLoader의 배치 사이즈. Defaults to 64.
+        valid_batch_size (int, optional): 검증용 DataLaoder의 배치 사이즈. Defaults to 512.
         drop_last (boot, optional): Train DataLoader의 마지막 배치를 버릴지 여부. Defaults to True.
         test_size (float, optional): 얼만큼의 비율로 데이터를 나눌지 결정. Defaults to 0.2.
         shuffle (bool, optional):
@@ -32,7 +34,8 @@ def get_train_test_loader(
             NOTE. 분리 이후 생성된 DataLoader는 shuffle 여부에 관계 없이 random iteration
 
     Returns:
-        [type]: [description]
+        train_loader (DataLoader): 학습용 DataLoader
+        test_loader (DataLoader): 검증용 DataLoader
     """    
     num_samples = len(dataset)
     indices = [i for i in range(num_samples)]
@@ -48,10 +51,10 @@ def get_train_test_loader(
     test_sampler = SubsetRandomSampler(test_indices)
 
     if drop_last:
-        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=True)
+        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True)
     else:
-        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=False)
-    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=batch_size, drop_last=False)
+        train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=False)
+    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=test_batch_size, drop_last=False)
 
     return train_loader, test_loader
 
