@@ -1,4 +1,8 @@
 import pickle
+import datetime
+import random
+import numpy as np
+import torch
 
 
 def load_pickle(path: str):
@@ -7,11 +11,22 @@ def load_pickle(path: str):
     return output
 
 
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-import matplotlib as mpl
+def set_seed(seed: int = 42, contain_cuda: bool = False):
+    random.seed(seed)
+    np.random.seed(seed)
+
+    if contain_cuda:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    print(f"Seed set as {seed}")
 
 
-def set_korfont(size: int = 9):
-    fontpath = "/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf"
-    font = fm.FontProperties(fname=fontpath, size=9)
+def get_timestamp():
+    KST = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(tz=KST)
+    now2str = now.strftime("%Y%m%d%H%M%S")
+    return now2str

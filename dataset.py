@@ -1,14 +1,39 @@
-import pandas as pd
+import random 
 from typing import Tuple
-from torch.utils.data import Dataset
+import pandas as pd
 import torch
-from transformers.utils import logging
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 
+from transformers.utils import logging
 logger = logging.get_logger(__name__)
+
 from config import Config, TokenizationType
 from utils import load_pickle
 from tokenization import load_tokenizer
 
+
+import random
+
+def get_train_test_loader(dataset: Dataset, batch_size: int=64, drop_last: bool=True, test_size: float=0.2, shuffle: bool=True):
+    num_samples = len(dataset)
+    indices = [i for i in range(num_samples)]
+
+    if shuffle:
+        random.shuffle(indices)
+
+    num_test = int(test_size * num_samples)
+    train_indices = indices[num_test:]
+    test_indices = indices[:num_test]
+
+    train_sampler = SubsetRandomSampler(train_indices)
+    test_sampler = SubsetRandomSampler(test_indices)
+
+
+    train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size)
+    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=batch_size)
+
+    return train_loader, test_loader
 
 class REDataset(Dataset):
     COLUMNS = [
@@ -79,5 +104,6 @@ class LabelEncoder:
 
 # just for debug
 if __name__ == "__main__":
-    config_redataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
-    REDataset(**config_redataset)
+    config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+    dataset = REDataset(**config_dataset)
+    train_loader, valid_loader = get_train_test_loader(dataset)

@@ -1,5 +1,5 @@
 import torch
-from load_tokenizer import load_tokenizer
+from tokenization import load_tokenizer
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data
