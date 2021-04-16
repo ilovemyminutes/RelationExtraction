@@ -1,4 +1,4 @@
-import random 
+import random
 from typing import Tuple
 import pandas as pd
 import torch
@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 from transformers.utils import logging
+
 logger = logging.get_logger(__name__)
 
 from config import Config, TokenizationType
@@ -15,7 +16,14 @@ from tokenization import load_tokenizer
 
 import random
 
-def get_train_test_loader(dataset: Dataset, batch_size: int=64, drop_last: bool=True, test_size: float=0.2, shuffle: bool=True):
+
+def get_train_test_loader(
+    dataset: Dataset,
+    batch_size: int = 64,
+    drop_last: bool = True,
+    test_size: float = 0.2,
+    shuffle: bool = True,
+):
     num_samples = len(dataset)
     indices = [i for i in range(num_samples)]
 
@@ -29,11 +37,11 @@ def get_train_test_loader(dataset: Dataset, batch_size: int=64, drop_last: bool=
     train_sampler = SubsetRandomSampler(train_indices)
     test_sampler = SubsetRandomSampler(test_indices)
 
-
-    train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size)
-    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=batch_size)
+    train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=batch_size, drop_last=True)
+    test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=batch_size, drop_last=False)
 
     return train_loader, test_loader
+
 
 class REDataset(Dataset):
     COLUMNS = [
