@@ -25,6 +25,10 @@ class Config:
     SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
+    Epochs: int = 10
+    Batch32: int=32
+    Batch64: int=64
+    Seed: int=42
 
 
 @dataclass
@@ -46,12 +50,12 @@ class TrainArgs:
     Base: dict = dict(
         output_dir=Config.SavePath,
         overwrite_output_dir=True,
-        num_train_epochs=10,
-        per_device_train_batch_size=32,
-        per_device_eval_batch_size=64,
+        num_train_epochs=Config.Epochs,
+        per_device_train_batch_size=Config.Batch32,
+        per_device_eval_batch_size=Config.Batch64,
         warmup_steps=500,
         weight_decay=0.01,
-        seed=42,
+        seed=Config.Seed,
         logging_dir=Config.Logs,
         logging_steps=100,
         save_steps=1000,
