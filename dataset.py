@@ -36,7 +36,10 @@ def get_train_test_loader(
     Returns:
         train_loader (DataLoader): 학습용 DataLoader
         test_loader (DataLoader): 검증용 DataLoader
-    """    
+    """
+    if test_size == 0 or test_size > 1:
+        raise ValueError('test_size should be between 0 and 1.')
+        
     num_samples = len(dataset)
     indices = [i for i in range(num_samples)]
 
@@ -44,16 +47,18 @@ def get_train_test_loader(
         random.shuffle(indices)
 
     num_test = int(test_size * num_samples)
+
+    # train loader
     train_indices = indices[num_test:]
-    test_indices = indices[:num_test]
-
     train_sampler = SubsetRandomSampler(train_indices)
-    test_sampler = SubsetRandomSampler(test_indices)
-
     if drop_last:
         train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True)
     else:
         train_loader = DataLoader(dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=False)
+
+    # test loader
+    test_indices = indices[:num_test]
+    test_sampler = SubsetRandomSampler(test_indices)
     test_loader = DataLoader(dataset, sampler=test_sampler, batch_size=test_batch_size, drop_last=False)
 
     return train_loader, test_loader

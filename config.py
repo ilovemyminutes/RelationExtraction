@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+import torch
 
 
 TRAIN = "./input/data/train/train.tsv"
@@ -27,6 +28,7 @@ class Config:
     Batch32: int = 32
     Batch64: int = 64
     Seed: int = 42
+    Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 @dataclass

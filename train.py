@@ -1,8 +1,8 @@
 import torch
 from tokenization import load_tokenizer
-from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
+from transformers import Trainer, TrainingArguments
 from models import load_model
-from dataset import REDataset, apply_tokenization, load_data
+from dataset import REDataset, get_train_test_loader
 from config import ModelType, Config, PreTrainedType, TokenizationType, TrainArgs
 from evaluation import compute_metrics
 
@@ -13,22 +13,12 @@ def train(
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     tokenization_type: str = TokenizationType.Base,
     num_classes: int = Config.NumClasses,
+    device: str = Config.Device
 ):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    model = load_model(model_type, pretrained_type, num_classes)
-    model.to(device)
-    tokenizer = load_tokenizer(type=tokenization_type)
-
-    # TODO: 우선 이렇게 작성해본 뒤에, load_data 내에 apply_tokenization를 포함시키는 것이 좋을 것 같으면 수정하자.
-    dataset_raw, labels = load_data(path=data_root)
-    dataset_tokenized = apply_tokenization(
-        dataset=dataset_raw, tokenizer=tokenizer, method=TokenizationType.Base
-    )
-    dataset = REDataset(tokenized_dataset=dataset_tokenized, labels=labels)
-    # data_collator = DataCollatorForLanguageModeling(
-    #     tokenizer=tokenizer, mlm=True, mlm_probability=0.15
-    # )
+    model = load_model(model_type, pretrained_type, num_classes).to(device)
+    dataset = REDataset(root=data_root, tokenization_type=tokenization_type)
+    train_loader, valid_loader = get_train_test_loader(dataset)
+    
 
     training_args = TrainingArguments(**TrainArgs.Base)
     trainer = Trainer(
