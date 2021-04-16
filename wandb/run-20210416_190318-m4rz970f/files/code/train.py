@@ -17,6 +17,7 @@ warnings.filterwarnings("ignore")
 
 
 VALID_CYCLE = 100
+# TIMESTAMP = None
 
 
 def train(
@@ -146,11 +147,9 @@ def train(
         )
 
         if save_path and valid_eval["accuracy"] >= best_acc:
-            name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({TIMESTAMP}).pth"
+            name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({timestamp}).pth"
             best_acc = valid_eval["accuracy"]
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
-            
 
 
 def validate(model, valid_loader, criterion):
@@ -219,8 +218,8 @@ if __name__ == "__main__":
 
     # register logs to wandb
     args = parser.parse_args()
-    TIMESTAMP = get_timestamp()
-    name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+    timestamp = get_timestamp()
+    name = args.model_type + "_" + args.pretrained_type + "_" + timestamp
     run = wandb.init(project="pstage-klue", name=name, reinit=True)
     wandb.config.update(args)
 

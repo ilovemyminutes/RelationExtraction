@@ -1,0 +1,79 @@
+diff --git a/config.py b/config.py
+index 629f8a4..c60715f 100644
+--- a/config.py
++++ b/config.py
+@@ -8,6 +8,7 @@ TEST = "./input/data/test/test.tsv"
+ LABEL = "./input/data/label_type.pkl"
+ SAVEPATH = "./saved_models"
+ LOGS = "./logs"
++CKPT = "./saved_models"
+ 
+ DOT = "."
+ 
+@@ -31,6 +32,7 @@ class Config:
+     LR: float = 0.001
+     Seed: int = 42
+     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
++    CheckPoint: str = CKPT if os.path.isfile(CKPT) else DOT + CKPT
+ 
+ 
+ @dataclass
+diff --git a/train.py b/train.py
+index 5a34b96..202158d 100644
+--- a/train.py
++++ b/train.py
+@@ -1,5 +1,6 @@
+ import argparse
+ import os
++import warnings
+ from tqdm import tqdm
+ import numpy as np
+ import torch
+@@ -11,6 +12,7 @@ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+ from utils import get_timestamp, set_seed
+ from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
++warnings.filterwarnings("ignore")
+ 
+ 
+ VALID_CYCLE = 100
+@@ -59,7 +61,7 @@ def train(
+     criterion = get_criterion(type=loss_type)
+     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
+     if lr_scheduler is not None:
+-        scheduler = get_scheduler(type=lr_scheduler)
++        scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
+ 
+     # train phase
+     best_acc = 0
+@@ -97,8 +99,7 @@ def train(
+             # evaluation phase
+             train_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
+             train_loss = total_loss / len(true_arr)
+-            verbose(phase='Train', eval=train_eval, loss=train_loss)
+-
++            
+             if epoch == 0:
+                 wandb.log(
+                     {
+@@ -115,6 +116,7 @@ def train(
+                     model=model, valid_loader=valid_loader, criterion=criterion
+                 )
+                 verbose(phase='Valid', eval=train_eval, loss=train_loss)
++                verbose(phase='Train', eval=train_eval, loss=train_loss)
+ 
+                 if epoch == 0:
+                     wandb.log(
+@@ -202,10 +204,10 @@ if __name__ == "__main__":
+     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
+     parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+     parser.add_argument("--valid-batch-size", type=int, default=512)
+-    parser.add_argument("--optim-type", type=str, default=Config.Adam)
++    parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
+     parser.add_argument("--loss-type", type=str, default=Loss.CE)
+     parser.add_argument("--lr", type=float, default=Config.LR)
+-    parser.add_argument("--lr-scheduler", type=str, default=Config.CosineScheduler)
++    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineScheduler)
+     parser.add_argument("--device", type=str, default=Config.Device)
+     parser.add_argument("--seed", type=int, default=Config.Seed)
+     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)

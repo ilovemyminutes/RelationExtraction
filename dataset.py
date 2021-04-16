@@ -1,16 +1,15 @@
-import os
-import pickle
+import random
+from typing import Tuple
 import pandas as pd
-from torch.utils.data import Dataset
 import torch
-from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers import BertTokenizer, DataCollatorForLanguageModeling
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
-from config import Config, TokenizeType
+from config import Config, TokenizationType
 from utils import load_pickle
-
+from tokenization import load_tokenizer
 
 COLUMNS = [
     "id",
@@ -25,7 +24,118 @@ COLUMNS = [
 ]
 
 
-def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
+# TODO: K-Fold
+
+
+def get_train_test_loader(
+    dataset: Dataset,
+    test_size: float = 0.2,
+    train_batch_size: int = 32,
+    test_batch_size: int = 512,
+    drop_last: bool = True,
+    shuffle: bool = True,
+):
+    """데이터셋을 입력 받아 train, test DataLoader를 생성하는 함수
+
+    Args:
+        dataset (Dataset):
+        train_batch_size (int, optional): 학습용 DataLoader의 배치 사이즈. Defaults to 64.
+        valid_batch_size (int, optional): 검증용 DataLaoder의 배치 사이즈. Defaults to 512.
+        drop_last (boot, optional): Train DataLoader의 마지막 배치를 버릴지 여부. Defaults to True.
+        test_size (float, optional): 얼만큼의 비율로 데이터를 나눌지 결정. Defaults to 0.2.
+        shuffle (bool, optional):
+            데이터 분리 과정에서 셔플을 진행할 지 여부
+            NOTE. 분리 이후 생성된 DataLoader는 shuffle 여부에 관계 없이 random iteration
+
+    Returns:
+        train_loader (DataLoader): 학습용 DataLoader
+        test_loader (DataLoader): 검증용 DataLoader
+    """
+    if test_size == 0 or test_size > 1:
+        raise ValueError("test_size should be between 0 and 1.")
+
+    num_samples = len(dataset)
+    indices = [i for i in range(num_samples)]
+
+    if shuffle:
+        random.shuffle(indices)
+
+    num_test = int(test_size * num_samples)
+
+    # train loader
+    train_indices = indices[num_test:]
+    train_sampler = SubsetRandomSampler(train_indices)
+    if drop_last:
+        train_loader = DataLoader(
+            dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True
+        )
+    else:
+        train_loader = DataLoader(
+            dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=False
+        )
+
+    # test loader
+    test_indices = indices[:num_test]
+    test_sampler = SubsetRandomSampler(test_indices)
+    test_loader = DataLoader(
+        dataset, sampler=test_sampler, batch_size=test_batch_size, drop_last=False
+    )
+
+    return train_loader, test_loader
+
+
+class REDataset(Dataset):
+    def __init__(
+        self,
+        root: str = Config.Train,
+        tokenization_type: str = TokenizationType.Base,
+        device: str = Config.Device,
+    ):
+        self.tokenizer = load_tokenizer(type=tokenization_type)
+        self.enc = LabelEncoder()
+        raw = self._load_raw(root)
+        self.sentences = self._tokenize(raw)
+        self.labels = raw["label"].tolist()
+        self.device = device
+
+    def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
+        sentence = {
+            key: torch.as_tensor(val[idx]).to(self.device)
+            for key, val in self.sentences.items()
+        }
+        label = torch.as_tensor(self.labels[idx]).to(self.device)
+        return sentence, label
+
+    def __len__(self):
+        return len(self.labels)
+
+    def _load_raw(self, root):
+        print("Load raw data...", end="\t")
+        raw = pd.read_csv(root, sep="\t", header=None)
+        raw.columns = COLUMNS
+        raw = raw.drop("id", axis=1)
+        raw["label"] = raw["label"].apply(lambda x: self.enc.transform(x))
+        print("done!")
+        return raw
+
+    def _tokenize(self, data):
+        print("Apply Tokenization...", end="\t")
+        data_tokenized = self.tokenizer(
+            data["relation_state"].tolist(),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=128,
+            add_special_tokens=True,
+        )
+        print("done!")
+        return data_tokenized
+
+
+# for EDA mainly
+def load_data(
+    path: str, drop_id: bool = True, encode_label: bool = True
+) -> Tuple[pd.DataFrame, list]:
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -37,42 +147,11 @@ def load_data(path: str, drop_id: bool = True, encode_label: bool = True):
         data.drop("id", axis=1, inplace=True)
 
     # encode label from string to integer
-    if encode_label and path != Config.Test:
+    if encode_label:
         enc = LabelEncoder()
         data["label"] = data["label"].apply(lambda x: enc.transform(x))
+
     return data
-
-
-def apply_tokenization(dataset, tokenizer, method: str = TokenizeType.Base):
-    if method == TokenizeType.Base:
-        tokenized_dataset = tokenizer(
-            dataset["relation_state"].tolist(),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=100,
-            add_special_tokens=True,
-        )
-    else:
-        raise NotImplementedError
-    return tokenized_dataset
-
-
-class REDataset(Dataset):
-    def __init__(self, tokenized_dataset, labels):
-        self.tokenized_dataset = tokenized_dataset
-        self.labels = labels
-
-    def __getitem__(self, idx):
-        item = {
-            key: torch.as_tensor(val[idx])
-            for key, val in self.tokenized_dataset.items()
-        }
-        item["labels"] = torch.as_tensor(self.labels[idx])
-        return item
-
-    def __len__(self):
-        return len(self.labels)
 
 
 class LabelEncoder:
@@ -85,3 +164,10 @@ class LabelEncoder:
 
     def inverse_transform(self, x):
         return self.decoder[x]
+
+
+# just for debug
+if __name__ == "__main__":
+    config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+    dataset = REDataset(**config_dataset)
+    train_loader, valid_loader = get_train_test_loader(dataset)
