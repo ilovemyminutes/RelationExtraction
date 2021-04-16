@@ -4,17 +4,11 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
-
 from transformers.utils import logging
-
 logger = logging.get_logger(__name__)
-
 from config import Config, TokenizationType
 from utils import load_pickle
 from tokenization import load_tokenizer
-
-
-import random
 
 
 def get_train_test_loader(
