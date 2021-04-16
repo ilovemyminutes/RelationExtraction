@@ -1,8 +1,6 @@
-import pickle as pickle
-import os
 import pandas as pd
 import argparse
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 
 def main(args):
@@ -11,6 +9,18 @@ def main(args):
     acc = accuracy_score(list(pred["pred"]), list(answer["answer"]))
     print("accuracy: ", acc)
 
+def compute_metrics(pred, labels):
+    labels = pred.label_ids
+    preds = pred.predictions.argmax(-1)
+    precision, recall, f1, _ = precision_recall_fscore_support(labels, preds, average='binary')
+    acc = accuracy_score(labels, preds)
+
+    return dict(
+        accuracy=acc,
+        f1=f1,
+        precision=precision,
+        recall=recall
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
