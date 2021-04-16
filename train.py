@@ -14,11 +14,10 @@ from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationTyp
 VALID_CYCLE = 100
 
 
-
 def train(
     data_root: str = Config.Train,
     model_type: str = ModelType.SequenceClf,
-    epochs: int = 1, 
+    epochs: int = 1,
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     tokenization_type: str = TokenizationType.Base,
     num_classes: int = Config.NumClasses,
@@ -26,10 +25,12 @@ def train(
     optim_type: str = Optimizer.Adam,
     lr: float = Config.LR,
     lr_scheduler: str = Optimizer.CosineScheduler,
-    device: str = Config.Device
+    device: str = Config.Device,
 ):
     # load data
-    dataset = REDataset(root=data_root, tokenization_type=tokenization_type, device=device)
+    dataset = REDataset(
+        root=data_root, tokenization_type=tokenization_type, device=device
+    )
     train_loader, valid_loader = get_train_test_loader(dataset)
 
     # load model
@@ -39,19 +40,19 @@ def train(
 
     # load object func, optimizer
     criterion = get_criterion(type=loss_type)
-    optimizer = get_optimizer(model, optim_type=, lr=lr)
+    optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
     if lr_scheduler is not None:
-        scheduler = get_scheduler()
+        scheduler = get_scheduler(type=lr_scheduler)
 
     for epoch in range(epochs):
-        print(f'Epoch: {epoch}')
+        print(f"Epoch: {epoch}")
 
         # ACC, RECALL, PRECISION, F1
         pred_list = []
         true_list = []
-        total_loss = 0 # CE Loss
+        total_loss = 0  # CE Loss
 
-        for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc='[Train]'):
+        for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc="[Train]"):
             outputs = model(**sentences).logits
             loss = criterion(outputs, labels)
             total_loss += loss.item()
@@ -59,6 +60,8 @@ def train(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if lr_scheduler is not None:
+                scheduler.step()
 
             _, preds = torch.max(outputs, dim=1)
             preds = preds.data.cpu().numpy()
@@ -66,16 +69,18 @@ def train(
 
             pred_list.append(preds)
             true_list.append(labels)
-        
+
             pred_arr = np.hstack(pred_list)
             true_arr = np.hstack(true_list)
 
             # evaluation phase
-            train_eval = evaluate(y_true=true_arr, y_pred=pred_arr) # ACC, F1, PRC, REC
+            train_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
             train_loss = total_loss / len(true_arr)
 
             if idx != 0 and idx % VALID_CYCLE == 0:
-                return
+                valid_eval, valid_loss = validate(
+                    model=model, valid_loader=valid_loader, criterion=criterion
+                )
 
 
 def validate(model, valid_loader, criterion):
@@ -85,7 +90,7 @@ def validate(model, valid_loader, criterion):
 
     with torch.no_grad():
         model.eval()
-        for sentences, labels in tqdm(valid_loader, desc='[Valid]'):
+        for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
             outputs = model(**sentences).logits
             loss = criterion(outputs, labels)
             total_loss += loss.item()
@@ -96,12 +101,12 @@ def validate(model, valid_loader, criterion):
 
             pred_list.append(preds)
             true_list.append(labels)
-        
+
         pred_arr = np.hstack(pred_list)
         true_arr = np.hstack(true_list)
 
         # evaluation phase
-        valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr) # ACC, F1, PRC, REC
+        valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
         valid_loss = total_loss / len(true_arr)
         model.train()
 

@@ -3,14 +3,14 @@ from adamp import AdamP
 from config import Optimizer
 
 
-def get_optimizer(model: nn.Module, optim_type: str, lr: float):
-    if optim_type == Optimizer.Adam:
+def get_optimizer(model: nn.Module, type: str, lr: float):
+    if type == Optimizer.Adam:
         optimizer = optim.Adam(model.parameters(), lr=lr)
-    elif optim_type == Optimizer.SGD:
+    elif type == Optimizer.SGD:
         optimizer = optim.SGD(model.parameters(), lr=lr)
-    elif optim_type == Optimizer.Momentum:
+    elif type == Optimizer.Momentum:
         optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-    elif optim_type == Optimizer.AdamP:
+    elif type == Optimizer.AdamP:
         optimizer = AdamP(
             model.parameters(), lr=lr, betas=(0.9, 0.999), weight_decay=1e-2
         )
