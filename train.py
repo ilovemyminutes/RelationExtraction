@@ -1,6 +1,5 @@
-from tokenizer import load_tokenizer
 import torch
-from sklearn.metrics import accuracy_score
+from tokenizers import load_tokenizer
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 from models import load_model
 from dataset import REDataset, apply_tokenization, load_data

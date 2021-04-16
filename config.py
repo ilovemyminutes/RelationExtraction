@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass
 
-from tokenizers.implementations.base_tokenizer import BaseTokenizer
-
 
 TRAIN = "./input/data/train/train.tsv"
 TEST = "./input/data/test/test.tsv"

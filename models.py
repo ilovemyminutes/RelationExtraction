@@ -1,5 +1,4 @@
-from transformers import BertModel, BertConfig
-from transformers.utils.dummy_pt_objects import BertForSequenceClassification
+from transformers import BertModel, BertConfig, BertForSequenceClassification
 from config import ModelType, Config, ModelType, PreTrainedType
 
 
@@ -10,14 +9,15 @@ def load_model(
 ):
     print("Load Model...", end="\t")
     bert_config = BertConfig.from_pretrained(pretrained_type)
+    bert_config.num_labels = num_classes
 
     if model_type == ModelType.Base:
         model = BertModel.from_pretrained(
-            pretrained_type, config=bert_config, num_classes=num_classes
+            pretrained_type, config=bert_config
         )
     elif model_type == ModelType.SequenceClf:
         model = BertForSequenceClassification.from_pretrained(
-            pretrained_type, config=bert_config, num_classes=num_classes
+            pretrained_type, config=bert_config
         )
     else:
         raise NotImplementedError()

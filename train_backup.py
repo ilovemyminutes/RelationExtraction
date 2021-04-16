@@ -1,4 +1,4 @@
-from tokenizer import load_tokenizer
+from tokenizers import load_tokenizer
 import torch
 from sklearn.metrics import accuracy_score
 from transformers import (

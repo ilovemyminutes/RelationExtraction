@@ -1,5 +1,6 @@
 from transformers import BertTokenizer
-from config import TokenizationType, ModelType
+from config import TokenizationType, PreTrainedType
+
 
 
 def load_tokenizer(type: str = TokenizationType.Base):
@@ -14,7 +15,7 @@ def load_tokenizer(type: str = TokenizationType.Base):
     """
     print('Load Tokenizer...', end='\t')
     if type == TokenizationType.Base:
-        tokenizer = BertTokenizer.from_pretrained(ModelType.BertMultiLingual)
+        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)
     else:
         raise NotImplementedError
     print('done!')
