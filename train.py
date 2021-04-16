@@ -6,9 +6,13 @@ from evaluation import evaluate
 from transformers import Trainer, TrainingArguments
 from models import load_model
 from dataset import REDataset, get_train_test_loader
-from optims import get_optimizer, get_scheduler
+from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
+
+
+VALID_CYCLE = 100
+
 
 
 def train(
@@ -21,6 +25,7 @@ def train(
     loss_type: str = Loss.CE,
     optim_type: str = Optimizer.Adam,
     lr: float = Config.LR,
+    lr_scheduler: str = Optimizer.CosineScheduler,
     device: str = Config.Device
 ):
     # load data
@@ -35,7 +40,8 @@ def train(
     # load object func, optimizer
     criterion = get_criterion(type=loss_type)
     optimizer = get_optimizer(model, optim_type=, lr=lr)
-    
+    if lr_scheduler is not None:
+        scheduler = get_scheduler()
 
     for epoch in range(epochs):
         print(f'Epoch: {epoch}')
@@ -43,13 +49,10 @@ def train(
         # ACC, RECALL, PRECISION, F1
         pred_list = []
         true_list = []
+        total_loss = 0 # CE Loss
 
-        # CE Loss
-        total_loss = 0
-        num_samples = 0
-
-        for sents, labels in tqdm(train_loader, desc='Train'):
-            outputs = model(**sents).logits
+        for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc='[Train]'):
+            outputs = model(**sentences).logits
             loss = criterion(outputs, labels)
             total_loss += loss.item()
 
@@ -57,7 +60,35 @@ def train(
             loss.backward()
             optimizer.step()
 
-            num_samples += len(labels)
+            _, preds = torch.max(outputs, dim=1)
+            preds = preds.data.cpu().numpy()
+            labels = labels.data.cpu().numpy()
+
+            pred_list.append(preds)
+            true_list.append(labels)
+        
+            pred_arr = np.hstack(pred_list)
+            true_arr = np.hstack(true_list)
+
+            # evaluation phase
+            train_eval = evaluate(y_true=true_arr, y_pred=pred_arr) # ACC, F1, PRC, REC
+            train_loss = total_loss / len(true_arr)
+
+            if idx != 0 and idx % VALID_CYCLE == 0:
+                return
+
+
+def validate(model, valid_loader, criterion):
+    pred_list = []
+    true_list = []
+    total_loss = 0
+
+    with torch.no_grad():
+        model.eval()
+        for sentences, labels in tqdm(valid_loader, desc='[Valid]'):
+            outputs = model(**sentences).logits
+            loss = criterion(outputs, labels)
+            total_loss += loss.item()
 
             _, preds = torch.max(outputs, dim=1)
             preds = preds.data.cpu().numpy()
@@ -69,24 +100,12 @@ def train(
         pred_arr = np.hstack(pred_list)
         true_arr = np.hstack(true_list)
 
-        # Calculate metrics
-        precision, recal, f1, _ = precision_recall_fscore_support(y_true=true_arr, y_pred=pred_arr, average='macro')
-        accuracy = accuracy_score(y_true=true_arr, y_pred=pred_arr)
-        train_loss = total_loss / num_samples
+        # evaluation phase
+        valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr) # ACC, F1, PRC, REC
+        valid_loss = total_loss / len(true_arr)
+        model.train()
 
-    
-
-    training_args = TrainingArguments(**TrainArgs.Base)
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=dataset,
-        # data_collator=data_collator, # TODO: Sequence Classification Task에 맞는 Data Collator를 구축
-        compute_metrics=compute_metrics
-    )
-    # train model
-    trainer.train()
-    trainer.evaluate(eval_dataset=dataset)
+    return valid_eval, valid_loss
 
 
 if __name__ == "__main__":
