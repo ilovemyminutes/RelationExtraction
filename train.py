@@ -15,9 +15,7 @@ from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationTyp
 
 warnings.filterwarnings("ignore")
 
-
-VALID_CYCLE = 100
-
+TOTAL_SAMPLES = 9000
 
 def train(
     model_type: str = ModelType.SequenceClf,
@@ -26,7 +24,7 @@ def train(
     load_state_dict: str = None,
     data_root: str = Config.Train,
     tokenization_type: str = TokenizationType.Base,
-    epochs: int = 1,
+    epochs: int = Config.Epochs,
     valid_size: float = Config.ValidSize,
     train_batch_size: int = Config.Batch32,
     valid_batch_size: int = 512,
@@ -207,11 +205,11 @@ if __name__ == "__main__":
     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch16)
     parser.add_argument("--valid-batch-size", type=int, default=512)
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LR)
+    parser.add_argument("--lr", type=float, default=Config.LRSlow)
     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineScheduler)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
@@ -225,6 +223,7 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
+    VALID_CYCLE = int(TOTAL_SAMPLES * args.valid_size) // 2 # 학습 과정에서 2번만 검증
     print("=" * 100)
     print(args)
     print("=" * 100)
