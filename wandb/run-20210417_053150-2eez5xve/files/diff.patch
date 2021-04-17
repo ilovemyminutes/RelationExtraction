@@ -1,0 +1,562 @@
+diff --git a/config.py b/config.py
+index 522a3d0..ce2d546 100644
+--- a/config.py
++++ b/config.py
+@@ -6,7 +6,6 @@ import torch
+ TRAIN = "./input/data/train/train.tsv"
+ TEST = "./input/data/test/test.tsv"
+ LABEL = "./input/data/label_type.pkl"
+-SAVEPATH = "./saved_models"
+ LOGS = "./logs"
+ 
+ DOT = "."
+@@ -20,12 +19,11 @@ class Config:
+ 
+     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
+     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
+-    ValidSize: float = 0.2
++    ValidSize: float = 0.25
+     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
+-    SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
+     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
+     NumClasses: int = 42
+-    Epochs: int = 20
++    Epochs: int = 10
+ 
+     Batch8:int = 8
+     Batch16: int = 16
+diff --git a/dataset.py b/dataset.py
+index d0d921c..d08be74 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -27,7 +27,7 @@ COLUMNS = [
+ # TODO: K-Fold
+ 
+ 
+-def get_train_test_loader(
++def split_train_test_loader(
+     dataset: Dataset,
+     test_size: float = 0.2,
+     train_batch_size: int = 32,
+@@ -170,4 +170,4 @@ class LabelEncoder:
+ if __name__ == "__main__":
+     config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+     dataset = REDataset(**config_dataset)
+-    train_loader, valid_loader = get_train_test_loader(dataset)
++    train_loader, valid_loader = split_train_test_loader(dataset)
+diff --git a/notebooks/Modeling with PyTorch.ipynb b/notebooks/Modeling with PyTorch.ipynb
+index 1f5ece6..54d385e 100644
+--- a/notebooks/Modeling with PyTorch.ipynb	
++++ b/notebooks/Modeling with PyTorch.ipynb	
+@@ -36,7 +36,7 @@
+     "from torch.utils.data import Dataset, DataLoader\n",
+     "\n",
+     "sys.path.insert(0, '../')\n",
+-    "from dataset import REDataset, get_train_test_loader, load_data\n",
++    "from dataset import REDataset, split_train_test_loader, load_data\n",
+     "from models import load_model\n",
+     "from tokenization import load_tokenizer\n",
+     "from config import Config, ModelType, PreTrainedType, TokenizationType\n",
+@@ -89,7 +89,7 @@
+   {
+    "source": [
+     "dataset = REDataset()\n",
+-    "train_loader, valid_loader = get_train_test_loader(dataset)"
++    "train_loader, valid_loader = split_train_test_loader(dataset)"
+    ],
+    "cell_type": "code",
+    "metadata": {},
+diff --git a/notebooks/Sketch - Model.ipynb b/notebooks/Sketch - Model.ipynb
+index 16d3a20..aaa6298 100644
+--- a/notebooks/Sketch - Model.ipynb	
++++ b/notebooks/Sketch - Model.ipynb	
+@@ -23,7 +23,7 @@
+  "cells": [
+   {
+    "cell_type": "code",
+-   "execution_count": 28,
++   "execution_count": 5,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+@@ -35,9 +35,114 @@
+     "\n",
+     "sys.path.insert(0, '../')\n",
+     "from models import load_model\n",
+-    "from config import Config, TrainArgs, ModelType, PreTrainedType, TokenizationType, TrainArgs\n",
+-    "from dataset import load_data, apply_tokenization, REDataset\n",
+-    "from load_tokenizer import load_tokenizer"
++    "from dataset import REDataset\n",
++    "from config import Config, ModelType, PreTrainedType"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 6,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "stream",
++     "name": "stdout",
++     "text": [
++      "Load Tokenizer...\tdone!\n",
++      "Load raw data...\tdone!\n",
++      "Apply Tokenization...\tdone!\n"
++     ]
++    }
++   ],
++   "source": [
++    "data = REDataset()"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 11,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 9,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "sent, label = data[0]"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 13,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "{'input_ids': tensor([   101,  50266,  11489,   9405,  24974,  24683,   9477,  90578,   9625,\n",
++       "         119376,  12692,  45725,   9651,  99183,  10459,   9376,  42771,  70186,\n",
++       "           9167,  15001,  11261,  41605,    113,  12001,  57836,    114,   9590,\n",
++       "           9706,  28396,    113,  13796,  19986,    114,   8843,  22634,    117,\n",
++       "           9638,   9376,  42771,  22879,   9651,  99183,  10459,   9684,  46520,\n",
++       "          11513,   9641, 119298,  11018,   9251,  11261,   9405,  24974, 118800,\n",
++       "          27792,  16139,    119,    102,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0,      0,      0,      0,      0,      0,      0,      0,\n",
++       "              0,      0], device='cuda:0'),\n",
++       " 'token_type_ids': tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0], device='cuda:0'),\n",
++       " 'attention_mask': tensor([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
++       "         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
++       "         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "         0, 0, 0, 0, 0, 0, 0, 0], device='cuda:0')}"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 13
++    }
++   ],
++   "source": [
++    "sent"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 12,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "error",
++     "ename": "ValueError",
++     "evalue": "not enough values to unpack (expected 2, got 1)",
++     "traceback": [
++      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
++      "\u001b[0;31mValueError\u001b[0m                                Traceback (most recent call last)",
++      "\u001b[0;32m<ipython-input-12-e908bdb89a5b>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m\u001b[0m\n\u001b[0;32m----> 1\u001b[0;31m \u001b[0mmodel\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m**\u001b[0m\u001b[0msent\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
++      "\u001b[0;32m/opt/conda/lib/python3.7/site-packages/torch/nn/modules/module.py\u001b[0m in \u001b[0;36m_call_impl\u001b[0;34m(self, *input, **kwargs)\u001b[0m\n\u001b[1;32m    720\u001b[0m             \u001b[0mresult\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mself\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0m_slow_forward\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m*\u001b[0m\u001b[0minput\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0;34m**\u001b[0m\u001b[0mkwargs\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    721\u001b[0m         \u001b[0;32melse\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 722\u001b[0;31m             \u001b[0mresult\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mself\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mforward\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m*\u001b[0m\u001b[0minput\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0;34m**\u001b[0m\u001b[0mkwargs\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m    723\u001b[0m         for hook in itertools.chain(\n\u001b[1;32m    724\u001b[0m                 \u001b[0m_global_forward_hooks\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mvalues\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m,\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
++      "\u001b[0;32m/opt/conda/lib/python3.7/site-packages/transformers/models/bert/modeling_bert.py\u001b[0m in \u001b[0;36mforward\u001b[0;34m(self, input_ids, attention_mask, token_type_ids, position_ids, head_mask, inputs_embeds, encoder_hidden_states, encoder_attention_mask, past_key_values, use_cache, output_attentions, output_hidden_states, return_dict)\u001b[0m\n\u001b[1;32m    910\u001b[0m         \u001b[0;32melif\u001b[0m \u001b[0minput_ids\u001b[0m \u001b[0;32mis\u001b[0m \u001b[0;32mnot\u001b[0m \u001b[0;32mNone\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    911\u001b[0m             \u001b[0minput_shape\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0minput_ids\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0msize\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 912\u001b[0;31m             \u001b[0mbatch_size\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mseq_length\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0minput_shape\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m    913\u001b[0m         \u001b[0;32melif\u001b[0m \u001b[0minputs_embeds\u001b[0m \u001b[0;32mis\u001b[0m \u001b[0;32mnot\u001b[0m \u001b[0;32mNone\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    914\u001b[0m             \u001b[0minput_shape\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0minputs_embeds\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0msize\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m[\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m-\u001b[0m\u001b[0;36m1\u001b[0m\u001b[0;34m]\u001b[0m\u001b[0;34m\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
++      "\u001b[0;31mValueError\u001b[0m: not enough values to unpack (expected 2, got 1)"
++     ]
++    }
++   ],
++   "source": [
++    "model(**sent)"
+    ]
+   },
+   {
+diff --git a/train.py b/train.py
+index 32c2b91..f2bcfac 100644
+--- a/train.py
++++ b/train.py
+@@ -1,16 +1,17 @@
+ import argparse
+ import os
+ import warnings
++from torch.utils.data.dataloader import DataLoader
+ from tqdm import tqdm
+ import numpy as np
+ import torch
+ import wandb
+ from evaluation import evaluate
+ from models import load_model
+-from dataset import REDataset, get_train_test_loader
++from dataset import REDataset, split_train_test_loader
+ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+-from utils import get_timestamp, set_seed
++from utils import get_timestamp, set_seed, verbose, ckpt_name
+ from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
+ 
+ warnings.filterwarnings("ignore")
+@@ -43,12 +44,17 @@ def train(
+     dataset = REDataset(
+         root=data_root, tokenization_type=tokenization_type, device=device
+     )
+-    train_loader, valid_loader = get_train_test_loader(
+-        dataset=dataset,
+-        test_size=valid_size,
+-        train_batch_size=train_batch_size,
+-        test_batch_size=valid_batch_size,
+-    )
++    if valid_size == 0:
++        is_valid = False # validation flag
++        train_loader = DataLoader(dataset, batch_size=train_batch_size, shuffle=True, drop_last=True)
++    else:
++        is_valid = True # validation flag
++        train_loader, valid_loader = split_train_test_loader(
++            dataset=dataset,
++            test_size=valid_size,
++            train_batch_size=train_batch_size,
++            test_batch_size=valid_batch_size,
++        )
+ 
+     # load model
+     model = load_model(model_type, pretrained_type, num_classes, load_state_dict)
+@@ -60,9 +66,16 @@ def train(
+     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
+     if lr_scheduler is not None:
+         scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
++    
++    # make checkpoint directory to save model during train
++    checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
++    if checkpoint_dir not in os.listdir(save_path):
++        os.mkdir(os.path.join(save_path, checkpoint_dir))
++    save_path = os.path.join(save_path, checkpoint_dir)
+ 
+     # train phase
+     best_acc = 0
++    best_loss = 999
+ 
+     for epoch in range(epochs):
+         print(f"Epoch: {epoch}")
+@@ -72,7 +85,10 @@ def train(
+         total_loss = 0
+ 
+         for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc="[Train]"):
+-            outputs = model(**sentences).logits
++            if model_type == ModelType.SequenceClf:
++                outputs = model(**sentences).logits
++            elif model_type == ModelType.Base:
++                outputs = model(**sentences).pooler_output
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+ 
+@@ -103,17 +119,17 @@ def train(
+                     {
+                         f"First EP Train ACC": train_eval["accuracy"],
+                         f"First EP Train F1": train_eval["f1"],
+-                        f"First EP Train PRC": train_eval["precision"],
+-                        f"First EP Train REC": train_eval["recall"],
++                        # f"First EP Train PRC": train_eval["precision"],
++                        # f"First EP Train REC": train_eval["recall"],
+                         f"First EP Train Loss": train_loss,
+                     }
+-                )
++                ) 
+ 
+-            if idx != 0 and idx % VALID_CYCLE == 0:
++            if (is_valid) and (idx != 0) and (idx % VALID_CYCLE == 0):
+                 valid_eval, valid_loss = validate(
+-                    model=model, valid_loader=valid_loader, criterion=criterion
++                    model=model, model_type=model_type, valid_loader=valid_loader, criterion=criterion
+                 )
+-                verbose(phase="Valid", eval=train_eval, loss=train_loss)
++                verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
+                 verbose(phase="Train", eval=train_eval, loss=train_loss)
+ 
+                 if epoch == 0:
+@@ -121,37 +137,72 @@ def train(
+                         {
+                             f"First EP Valid ACC": train_eval["accuracy"],
+                             f"First EP Valid F1": train_eval["f1"],
+-                            f"First EP Valid PRC": train_eval["precision"],
+-                            f"First EP Valid REC": train_eval["recall"],
++                            # f"First EP Valid PRC": train_eval["precision"],
++                            # f"First EP Valid REC": train_eval["recall"],
+                             f"First EP Valid Loss": train_loss,
+                         }
+                     )
+ 
++        
+         # logs for one epoch in total
+-        wandb.log(
+-            {
+-                "Train ACC": train_eval["accuracy"],
+-                "Valid ACC": valid_eval["accuracy"],
+-                "Train F1": train_eval["f1"],
+-                "Valid F1": valid_eval["f1"],
+-                "Train PRC": train_eval["precision"],
+-                "Valid PRC": valid_eval["precision"],
+-                "Train REC": train_eval["recall"],
+-                "Valid REC": valid_eval["recall"],
+-                "Train Loss": train_loss,
+-                "Valid Loss": valid_loss,
+-            }
+-        )
+-
+-        if save_path and valid_eval["accuracy"] >= best_acc:
+-            name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({TIMESTAMP}).pth"
+-            best_acc = valid_eval["accuracy"]
+-            torch.save(model.state_dict(), os.path.join(save_path, name))
+-            print(f'Model saved: {os.path.join(save_path, name)}')
+-            
+-
+-
+-def validate(model, valid_loader, criterion):
++        if is_valid:
++            wandb.log(
++                {
++                    "Train ACC": train_eval["accuracy"],
++                    "Valid ACC": valid_eval["accuracy"],
++                    "Train F1": train_eval["f1"],
++                    "Valid F1": valid_eval["f1"],
++                    # "Train PRC": train_eval["precision"],
++                    # "Valid PRC": valid_eval["precision"],
++                    # "Train REC": train_eval["recall"],
++                    # "Valid REC": valid_eval["recall"],
++                    "Train Loss": train_loss,
++                    "Valid Loss": valid_loss,
++                }
++            )
++        else:
++            wandb.log(
++                {
++                    "Train ACC": train_eval["accuracy"],
++                    "Train F1": train_eval["f1"],
++                    # "Train PRC": train_eval["precision"],
++                    # "Train REC": train_eval["recall"],
++                    "Train Loss": train_loss,
++                }
++            )
++
++        # Checkpoint: (1) Better Accuracy (2) Better Loss if accuracy is the same as before
++        if is_valid:
++            if save_path and valid_eval["accuracy"] > best_acc:
++                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss)
++                best_acc = valid_eval["accuracy"]
++                best_loss = valid_loss
++                torch.save(model.state_dict(), os.path.join(save_path, name))
++                print(f'Model saved: {os.path.join(save_path, name)}')
++
++            elif save_path and valid_eval["accuracy"] == best_acc and best_loss > valid_loss:
++                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss)
++                best_acc = valid_eval["accuracy"]
++                best_loss = valid_loss
++                torch.save(model.state_dict(), os.path.join(save_path, name))
++                print(f'Model saved: {os.path.join(save_path, name)}')
++        else:
++            if save_path and train_eval["accuracy"] > best_acc:
++                name = ckpt_name(model_type, pretrained_type, epoch, train_eval["accuracy"], train_loss)
++                best_acc = train_eval["accuracy"]
++                best_loss = train_loss
++                torch.save(model.state_dict(), os.path.join(save_path, name))
++                print(f'Model saved: {os.path.join(save_path, name)}')
++
++            elif save_path and train_eval["accuracy"] == best_acc and best_loss > train_loss:
++                name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({train_eval['accuracy']:.4f})loss({train_loss})id({TIMESTAMP}).pth"
++                best_loss = train_loss
++                torch.save(model.state_dict(), os.path.join(save_path, name))
++                print(f'Model saved: {os.path.join(save_path, name)}')
++
++
++
++def validate(model, model_type, valid_loader, criterion):
+     pred_list = []
+     true_list = []
+     total_loss = 0
+@@ -159,7 +210,10 @@ def validate(model, valid_loader, criterion):
+     with torch.no_grad():
+         model.eval()
+         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
+-            outputs = model(**sentences).logits
++            if model_type == ModelType.SequenceClf:
++                outputs = model(**sentences).logits
++            elif model_type == ModelType.Base:
++                outputs = model(**sentences).pooler_output
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+ 
+@@ -181,21 +235,13 @@ def validate(model, valid_loader, criterion):
+     return valid_eval, valid_loss
+ 
+ 
+-def verbose(phase: str, eval: dict, loss: float):
+-    acc = eval["accuracy"]
+-    f1 = eval["f1"]
+-    prc = eval["precision"]
+-    rec = eval["recall"]
+-    print(
+-        f"[{phase}] ACC: {acc:.4f} F1: {f1:.4f} PRC: {prc:.4f} REC: {rec:.4f} Loss: {loss:.4f}"
+-    )
+-
+ 
+ if __name__ == "__main__":
+     LOAD_STATE_DICT = None
++    TIMESTAMP = get_timestamp()
+ 
+     parser = argparse.ArgumentParser()
+-    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
++    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+     )
+@@ -217,7 +263,6 @@ if __name__ == "__main__":
+ 
+     # register logs to wandb
+     args = parser.parse_args()
+-    TIMESTAMP = get_timestamp()
+     name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+     run = wandb.init(project="pstage-klue", name=name, reinit=True)
+     wandb.config.update(args)
+diff --git a/utils.py b/utils.py
+index e764daf..8bd2c83 100644
+--- a/utils.py
++++ b/utils.py
+@@ -30,3 +30,16 @@ def get_timestamp():
+     now = datetime.datetime.now(tz=KST)
+     now2str = now.strftime("%Y%m%d%H%M%S")
+     return now2str
++
++def verbose(phase: str, eval: dict, loss: float):
++    acc = eval["accuracy"]
++    f1 = eval["f1"]
++    prc = eval["precision"]
++    rec = eval["recall"]
++    print(
++        f"[{phase}] ACC: {acc:.4f} F1: {f1:.4f} PRC: {prc:.4f} REC: {rec:.4f} Loss: {loss:.4f}"
++    )
++
++def ckpt_name(model_type, pretrained_type, epoch, score, loss):
++    name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({score:.4f})loss({loss:.4f})id({TIMESTAMP}).pth"
++    return name
+\ No newline at end of file
+diff --git a/wandb/latest-run b/wandb/latest-run
+index 25c39ef..765b6a9 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210416_190945-14py9lif
+\ No newline at end of file
++run-20210417_053150-2eez5xve
+\ No newline at end of file
+diff --git a/wandb/run-20210416_185943-1nts96q3/files/code/train.py b/wandb/run-20210416_185943-1nts96q3/files/code/train.py
+index 85790cd..2b83375 100644
+--- a/wandb/run-20210416_185943-1nts96q3/files/code/train.py
++++ b/wandb/run-20210416_185943-1nts96q3/files/code/train.py
+@@ -6,7 +6,7 @@ import torch
+ import wandb
+ from evaluation import evaluate
+ from models import load_model
+-from dataset import REDataset, get_train_test_loader
++from dataset import REDataset, split_train_test_loader
+ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+ from utils import get_timestamp, set_seed
+@@ -43,7 +43,7 @@ def train(
+     dataset = REDataset(
+         root=data_root, tokenization_type=tokenization_type, device=device
+     )
+-    train_loader, valid_loader = get_train_test_loader(
++    train_loader, valid_loader = split_train_test_loader(
+         dataset=dataset,
+         test_size=valid_size,
+         train_batch_size=train_batch_size,
+diff --git a/wandb/run-20210416_190034-3dxew85h/files/code/train.py b/wandb/run-20210416_190034-3dxew85h/files/code/train.py
+index ed3654f..ba2f74f 100644
+--- a/wandb/run-20210416_190034-3dxew85h/files/code/train.py
++++ b/wandb/run-20210416_190034-3dxew85h/files/code/train.py
+@@ -6,7 +6,7 @@ import torch
+ import wandb
+ from evaluation import evaluate
+ from models import load_model
+-from dataset import REDataset, get_train_test_loader
++from dataset import REDataset, split_train_test_loader
+ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+ from utils import get_timestamp, set_seed
+@@ -43,7 +43,7 @@ def train(
+     dataset = REDataset(
+         root=data_root, tokenization_type=tokenization_type, device=device
+     )
+-    train_loader, valid_loader = get_train_test_loader(
++    train_loader, valid_loader = split_train_test_loader(
+         dataset=dataset,
+         test_size=valid_size,
+         train_batch_size=train_batch_size,
+diff --git a/wandb/run-20210416_190318-m4rz970f/files/code/train.py b/wandb/run-20210416_190318-m4rz970f/files/code/train.py
+index 825eb54..25c73a3 100644
+--- a/wandb/run-20210416_190318-m4rz970f/files/code/train.py
++++ b/wandb/run-20210416_190318-m4rz970f/files/code/train.py
+@@ -7,7 +7,7 @@ import torch
+ import wandb
+ from evaluation import evaluate
+ from models import load_model
+-from dataset import REDataset, get_train_test_loader
++from dataset import REDataset, split_train_test_loader
+ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+ from utils import get_timestamp, set_seed
+@@ -46,7 +46,7 @@ def train(
+     dataset = REDataset(
+         root=data_root, tokenization_type=tokenization_type, device=device
+     )
+-    train_loader, valid_loader = get_train_test_loader(
++    train_loader, valid_loader = split_train_test_loader(
+         dataset=dataset,
+         test_size=valid_size,
+         train_batch_size=train_batch_size,
+diff --git a/wandb/run-20210416_190945-14py9lif/files/code/train.py b/wandb/run-20210416_190945-14py9lif/files/code/train.py
+index 5abb1e3..a84b76c 100644
+--- a/wandb/run-20210416_190945-14py9lif/files/code/train.py
++++ b/wandb/run-20210416_190945-14py9lif/files/code/train.py
+@@ -7,7 +7,7 @@ import torch
+ import wandb
+ from evaluation import evaluate
+ from models import load_model
+-from dataset import REDataset, get_train_test_loader
++from dataset import REDataset, split_train_test_loader
+ from optimizers import get_optimizer, get_scheduler
+ from criterions import get_criterion
+ from utils import get_timestamp, set_seed
+@@ -45,7 +45,7 @@ def train(
+     dataset = REDataset(
+         root=data_root, tokenization_type=tokenization_type, device=device
+     )
+-    train_loader, valid_loader = get_train_test_loader(
++    train_loader, valid_loader = split_train_test_loader(
+         dataset=dataset,
+         test_size=valid_size,
+         train_batch_size=train_batch_size,

@@ -13,6 +13,8 @@ input/data/*
 input/data/test/*
 input/data/train/*
 results/*/*
+saved_models/*
+saved_models/*/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -27,7 +27,7 @@ COLUMNS = [
 # TODO: K-Fold
 
 
-def get_train_test_loader(
+def split_train_test_loader(
     dataset: Dataset,
     test_size: float = 0.2,
     train_batch_size: int = 32,
@@ -170,4 +170,4 @@ class LabelEncoder:
 if __name__ == "__main__":
     config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
     dataset = REDataset(**config_dataset)
-    train_loader, valid_loader = get_train_test_loader(dataset)
+    train_loader, valid_loader = split_train_test_loader(dataset)

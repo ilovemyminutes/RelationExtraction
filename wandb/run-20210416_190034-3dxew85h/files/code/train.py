@@ -6,7 +6,7 @@ import torch
 import wandb
 from evaluation import evaluate
 from models import load_model
-from dataset import REDataset, get_train_test_loader
+from dataset import REDataset, split_train_test_loader
 from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from utils import get_timestamp, set_seed
@@ -43,7 +43,7 @@ def train(
     dataset = REDataset(
         root=data_root, tokenization_type=tokenization_type, device=device
     )
-    train_loader, valid_loader = get_train_test_loader(
+    train_loader, valid_loader = split_train_test_loader(
         dataset=dataset,
         test_size=valid_size,
         train_batch_size=train_batch_size,

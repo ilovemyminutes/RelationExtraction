@@ -6,7 +6,6 @@ import torch
 TRAIN = "./input/data/train/train.tsv"
 TEST = "./input/data/test/test.tsv"
 LABEL = "./input/data/label_type.pkl"
-SAVEPATH = "./saved_models"
 LOGS = "./logs"
 
 DOT = "."
@@ -20,12 +19,11 @@ class Config:
 
     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
-    ValidSize: float = 0.2
+    ValidSize: float = 0.25
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
-    SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 20
+    Epochs: int = 10
 
     Batch8:int = 8
     Batch16: int = 16
