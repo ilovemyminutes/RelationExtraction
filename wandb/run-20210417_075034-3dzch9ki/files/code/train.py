@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 TOTAL_SAMPLES = 9000
 
 def train(
-    model_type: str = ModelType.VanillaBert,
+    model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     num_classes: int = Config.NumClasses,
     pooler_idx: int = 0, 
@@ -218,9 +218,6 @@ def validate(model, model_type, valid_loader, criterion):
                 outputs = model(**sentences).logits
             elif model_type == ModelType.Base:
                 outputs = model(**sentences).pooler_output
-            else:
-                outputs = model(**sentences)
-                
             loss = criterion(outputs, labels)
             total_loss += loss.item()
 

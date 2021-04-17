@@ -218,9 +218,6 @@ def validate(model, model_type, valid_loader, criterion):
                 outputs = model(**sentences).logits
             elif model_type == ModelType.Base:
                 outputs = model(**sentences).pooler_output
-            else:
-                outputs = model(**sentences)
-                
             loss = criterion(outputs, labels)
             total_loss += loss.item()
 

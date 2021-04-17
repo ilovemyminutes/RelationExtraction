@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 TOTAL_SAMPLES = 9000
 
 def train(
-    model_type: str = ModelType.VanillaBert,
+    model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.BertMultiLingual,
     num_classes: int = Config.NumClasses,
     pooler_idx: int = 0, 
@@ -218,9 +218,6 @@ def validate(model, model_type, valid_loader, criterion):
                 outputs = model(**sentences).logits
             elif model_type == ModelType.Base:
                 outputs = model(**sentences).pooler_output
-            else:
-                outputs = model(**sentences)
-                
             loss = criterion(outputs, labels)
             total_loss += loss.item()
 
@@ -253,7 +250,7 @@ if __name__ == "__main__":
         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
     )
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
-    parser.add_argument("--pooler-idx", type=int, default=0)
+    parser.add_argument("--poolder-idx", type=int, default=0)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
     parser.add_argument("--data-root", type=str, default=Config.Train)
     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)

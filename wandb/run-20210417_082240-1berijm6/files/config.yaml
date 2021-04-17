@@ -1,0 +1,82 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.10.26
+    code_path: code/train.py
+    framework: huggingface
+    huggingface_version: 4.2.0
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.7.7
+    t:
+      1:
+      - 1
+      - 5
+      - 11
+      2:
+      - 1
+      - 5
+      - 11
+      3:
+      - 2
+      4: 3.7.7
+      5: 0.10.26
+      6: 4.2.0
+      8:
+      - 5
+data_root:
+  desc: null
+  value: ./input/data/train/train.tsv
+device:
+  desc: null
+  value: cuda:0
+epochs:
+  desc: null
+  value: 10
+load_state_dict:
+  desc: null
+  value: null
+loss_type:
+  desc: null
+  value: crossentropyloss
+lr:
+  desc: null
+  value: 0.0005
+lr_scheduler:
+  desc: null
+  value: CosineScheduler
+model_type:
+  desc: null
+  value: VanillaBert
+num_classes:
+  desc: null
+  value: 42
+optim_type:
+  desc: null
+  value: Adam
+pooler_idx:
+  desc: null
+  value: 0
+pretrained_type:
+  desc: null
+  value: bert-base-multilingual-cased
+save_path:
+  desc: null
+  value: ./saved_models
+seed:
+  desc: null
+  value: 42
+tokenization_type:
+  desc: null
+  value: Base
+train_batch_size:
+  desc: null
+  value: 16
+valid_batch_size:
+  desc: null
+  value: 512
+valid_size:
+  desc: null
+  value: 0.25

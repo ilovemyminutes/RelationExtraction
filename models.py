@@ -25,12 +25,7 @@ def load_model(
             pretrained_type, config=bert_config
         )
     elif model_type == ModelType.VanillaBert:
-        model = VanillaBert(
-            model_type=model_type,
-            pretrained_type=pretrained_type,
-            num_labels=num_classes,
-            pooler_idx=pooler_idx,
-        )
+        model = VanillaBert(model_type=ModelType.SequenceClf, pretrained_type=pretrained_type, num_labels=num_classes, pooler_idx=pooler_idx)
     else:
         raise NotImplementedError()
 
@@ -45,10 +40,10 @@ def load_model(
 class VanillaBert(nn.Module):
     def __init__(
         self,
-        model_type: str = ModelType.SequenceClf,
-        pretrained_type: str = PreTrainedType.BertMultiLingual,
+        model_type: str,
+        pretrained_type: str,
         num_labels: int = Config.NumClasses,
-        pooler_idx: int = "cls",
+        pooler_idx: int = 0,
     ):
         super(VanillaBert, self).__init__()
         # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.

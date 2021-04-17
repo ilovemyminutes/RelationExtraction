@@ -39,6 +39,7 @@ class Config:
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     CheckPoint: str = "./saved_models"
+    SavePath: str = "./predictions"
 
 
 @dataclass
@@ -64,6 +65,7 @@ class TokenizationType:
 
 @dataclass
 class ModelType:
+    VanillaBert: str = 'VanillaBert'
     Base: str = "BertModel"
     SequenceClf: str = "BertForSequenceClassification"
 

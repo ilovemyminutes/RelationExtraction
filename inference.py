@@ -1,76 +1,80 @@
-from transformers import (
-    AutoTokenizer,
-    BertForSequenceClassification,
-    Trainer,
-    TrainingArguments,
-    BertConfig,
-    BertTokenizer,
-)
-from torch.utils.data import DataLoader
-from load_data import *
+import argparse
+import os
+from tqdm import tqdm
+import numpy as np
 import pandas as pd
 import torch
-import pickle as pickle
-import numpy as np
-import argparse
-from dataset import load_test_dataset
+from torch.utils.data import DataLoader
+from dataset import REDataset
+from config import Config, ModelType, TokenizationType
+from models import load_model
 
 
-def inference(model, tokenized_sent, device):
-    dataloader = DataLoader(tokenized_sent, batch_size=40, shuffle=False)
-    model.eval()
-    output_pred = []
-
-    for i, data in enumerate(dataloader):
-        with torch.no_grad():
-            outputs = model(
-                input_ids=data["input_ids"].to(device),
-                attention_mask=data["attention_mask"].to(device),
-                token_type_ids=data["token_type_ids"].to(device),
-            )
-            logits = outputs[0]
-            logits = logits.detach().cpu().numpy()
-            result = np.argmax(logits, axis=-1)
-
-        output_pred.append(result)
-
-    return np.array(output_pred).flatten()
-
-
-def main(args):
-    """
-    주어진 dataset tsv 파일과 같은 형태일 경우 inference 가능한 코드입니다.
-    """
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # load tokenizer
-    TOK_NAME = "bert-base-multilingual-cased"
-    tokenizer = AutoTokenizer.from_pretrained(TOK_NAME)
-
-    # load my model
-    MODEL_NAME = args.model_dir  # model dir.
-    model = BertForSequenceClassification.from_pretrained(args.model_dir)
-    model.parameters
+def inference(
+    load_state_dict,
+    num_classes,
+    pooler_idx,
+    data_root,
+    tokenization_type,
+    device,
+    save_path,
+):
+    # load model
+    model_type, pretrained_type = get_model_pretrained_type(load_state_dict)
+    model = load_model(
+        model_type, pretrained_type, num_classes, load_state_dict, pooler_idx
+    )
     model.to(device)
 
-    # load test datset
-    test_dataset_dir = "./input/data/test/test.tsv"
-    test_dataset, test_label = load_test_dataset(test_dataset_dir, tokenizer)
-    test_dataset = RE_Dataset(test_dataset, test_label)
+    # load dataset
+    dataset = REDataset(data_root, tokenization_type, device)
+    dataloader = DataLoader(dataset, batch_size=512, shuffle=False, drop_last=False)
 
-    # predict answer
-    pred_answer = inference(model, test_dataset, device)
-    # make csv file with predicted answer
-    # 아래 directory와 columns의 형태는 지켜주시기 바랍니다.
+    # inference phase
+    pred_list = []
+    with torch.no_grad():
+        model.eval()
+        for sentences, _ in tqdm(dataloader, desc="[Inference]"):
+            if model_type == ModelType.SequenceClf:
+                outputs = model(**sentences).logits
+            elif model_type == ModelType.Base:
+                outputs = model(**sentences).pooler_output
+            else:
+                outputs = model(**sentences)
 
-    output = pd.DataFrame(pred_answer, columns=["pred"])
-    output.to_csv("./prediction/submission.csv", index=False)
+            _, preds = torch.max(outputs, dim=1)
+            preds = preds.data.cpu().numpy()
+            pred_list.append(preds)
+    pred_arr = np.hstack(pred_list)
+
+    # export phase
+    submission = pd.DataFrame(dict(pred=pred_arr.tolist()))
+
+    if save_path:
+        if load_state_dict not in os.listdir(save_path):
+            os.mkdir(os.path.join(save_path, load_state_dict))
+        save_path = os.path.join(save_path, load_state_dict)
+        fname = f"submission_{load_state_dict}.csv"
+        submission.to_csv(os.path.join(save_path, fname), index=False)
+    else:
+        return submission
+
+
+def get_model_pretrained_type(load_state_dict: str):
+    basename = os.path.basename(load_state_dict)
+    model_type = basename.split("_")[0]
+    pretrained_type = basename.split("_")[1]
+    return model_type, pretrained_type
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    LOAD_STATE_DICT = None
 
-    # model dir
-    parser.add_argument("--model_dir", type=str, default="./results/checkpoint-500")
-    args = parser.parse_args()
-    print(args)
-    main(args)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+    parser.add_argument("--pooler-idx", type=int, default=0)
+    parser.add_argument("--data-root", type=str, default=Config.Train)
+    parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+    parser.add_argument("--device", type=str, default=Config.Device)
+    parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
