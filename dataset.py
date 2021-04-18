@@ -11,6 +11,7 @@ from config import Config, PreProcessType
 from utils import load_pickle
 from tokenization import load_tokenizer
 
+
 COLUMNS = [
     "id",
     "relation_state",
@@ -168,8 +169,8 @@ class LabelEncoder:
     def __init__(self, meta_root: str = Config.Label):
         self.encoder = load_pickle(meta_root)
         self.decoder = {j: i for j, i in self.encoder.items()}
-        self.encoder['blind'] = 42
-        self.decoder[42] = 'blind'
+        self.encoder["blind"] = 42
+        self.decoder[42] = "blind"
 
     def transform(self, x):
         return self.encoder[x]

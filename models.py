@@ -53,8 +53,8 @@ class VanillaBert(nn.Module):
             pretrained_type=pretrained_type,
             num_labels=num_labels,
         )
-        self.layernorm = nn.LayerNorm(768)  # 768: output length of BERT, or backbone
-        self.dropout = nn.Dropout(p=0.8)
+        self.layernorm = nn.LayerNorm(768)  # 768: output length of backbone, BERT
+        self.dropout = nn.Dropout()
         self.relu = nn.ReLU()
         self.linear = nn.Linear(in_features=768, out_features=num_labels)
 
@@ -64,7 +64,7 @@ class VanillaBert(nn.Module):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
         )
-        x = x.last_hidden_state[:, self.idx, :]
+        x = x.last_hidden_state[:, self.idx, :] # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
         x = self.layernorm(x)
         x = self.dropout(x)
         x = self.relu(x)

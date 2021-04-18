@@ -59,9 +59,11 @@ class Loss:
 
 
 @dataclass
-class TokenizationType:
-    Base: str = "Base"
-    EM: str = "EM"  # Entity Marking
+class PreProcessType:
+    Base: str = "Base" # No preprocessing => 구려
+    ES: str = 'EntitySeparation' # Entity Separation, method as baseline of boostcamp itself
+    ESP: str = 'ESPositionEmbedding' # Entity Separation with Position Embedding, add scalar for each values in entities
+    EM: str = "EntityMarker"  # Entity Marking
 
 
 @dataclass
