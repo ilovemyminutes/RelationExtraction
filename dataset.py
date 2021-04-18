@@ -2,7 +2,6 @@ import random
 from typing import Tuple, Dict
 import pandas as pd
 import torch
-from torch.functional import Tensor
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
@@ -58,7 +57,7 @@ class REDataset(Dataset):
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=128,
+            max_length=100,
             add_special_tokens=True,
         )
         print("done!")
@@ -71,6 +70,7 @@ class REDataset(Dataset):
         raw.columns = COLUMNS
         raw = raw.drop("id", axis=1)
         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+        raw['label'] = raw[raw['label'] != 0].reset_index(drop=True)
         print(f"preprocessing for '{preprocess_type}'...", end="\t")
         data = preprocess_text(raw, method=preprocess_type)
         print("done!")

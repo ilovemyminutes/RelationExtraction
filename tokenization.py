@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from transformers import BertTokenizer
+from transformers import BertTokenizer, AutoTokenizer
 from config import PreProcessType, PreTrainedType
 
 @dataclass
@@ -34,7 +34,7 @@ def load_tokenizer(type: str = PreProcessType.Base):
     """
     print("Load Tokenizer...", end="\t")
     if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
-        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)
+        tokenizer = AutoTokenizer.from_pretrained(PreTrainedType.MultiLingual)
     else:
         raise NotImplementedError
     print("done!")

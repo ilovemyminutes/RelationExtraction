@@ -1,0 +1,24 @@
+{
+    "os": "Linux-4.4.0-59-generic-x86_64-with-debian-buster-sid",
+    "python": "3.7.7",
+    "heartbeatAt": "2021-04-18T07:44:53.646631",
+    "startedAt": "2021-04-18T07:44:52.657230",
+    "docker": null,
+    "gpu": "Tesla V100-PCIE-32GB",
+    "gpu_count": 1,
+    "cpu_count": 16,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/iloveslowfood/RelationExtraction.git",
+        "commit": "4a5c23422b4f1631b3af2c5ef3ebc02a1eb0c1e8"
+    },
+    "email": "silkstaff@naver.com",
+    "root": "/opt/ml/RelationExtraction",
+    "host": "f5834a502924",
+    "username": "root",
+    "executable": "/opt/conda/bin/python"
+}

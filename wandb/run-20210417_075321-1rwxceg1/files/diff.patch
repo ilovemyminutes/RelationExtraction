@@ -16,7 +16,7 @@ index 0f8c2f8..56a0230 100644
 +++ b/train.py
 @@ -22,6 +22,7 @@ def train(
      model_type: str = ModelType.SequenceClf,
-     pretrained_type: str = PreTrainedType.BertMultiLingual,
+     pretrained_type: str = PreTrainedType.MultiLingual,
      num_classes: int = Config.NumClasses,
 +    pooler_idx: int = 0, 
      load_state_dict: str = None,
@@ -48,7 +48,7 @@ index 0f8c2f8..56a0230 100644
 -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
 +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
      parser.add_argument(
-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
      )
 -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
 +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)

@@ -75,4 +75,5 @@ class ModelType:
 
 @dataclass
 class PreTrainedType:
-    BertMultiLingual: str = "bert-base-multilingual-cased"
+    MultiLingual: str = "bert-base-multilingual-cased"
+    BaseUncased: str= "bert-base-uncased"

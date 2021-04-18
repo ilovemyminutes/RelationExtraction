@@ -69,7 +69,7 @@ def get_model_pretrained_type(load_state_dict: str):
 
 
 if __name__ == "__main__":
-    MODELNAME = "VanillaBert_bert-base-multilingual-cased_20210417181839/VanillaBert_bert-base-multilingual-cased_ep(02)acc(0.4878)loss(0.0048)id(20210417181839).pth"
+    MODELNAME = "VanillaBert_bert-base-multilingual-cased_20210418164452/VanillaBert_bert-base-multilingual-cased_ep(02)acc(0.4878)loss(0.0048)id(20210418164452).pth"
     LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)
 
     parser = argparse.ArgumentParser()

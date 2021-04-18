@@ -24,7 +24,7 @@ index 779849b..b54c1ed 100644
  
  def load_model(
 @@ -8,6 +10,7 @@ def load_model(
-     pretrained_type: str = PreTrainedType.BertMultiLingual,
+     pretrained_type: str = PreTrainedType.MultiLingual,
      num_classes: int = Config.NumClasses,
      load_state_dict: str = None,
 +    pooler_idx: int = 0 # get last hidden state from CLS
@@ -46,7 +46,7 @@ index 779849b..b54c1ed 100644
      return model
 +
 +class VanillaBert(nn.Module):
-+    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.BertMultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
++    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.MultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
 +        super(VanillaBert, self).__init__()
 +        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
 +        self.idx = 0 if pooler_idx in ['cls', 0] else pooler_idx 
@@ -110,7 +110,7 @@ index 0f8c2f8..b33a52a 100644
 -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
 +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
      parser.add_argument(
-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
      )
 -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
 +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)

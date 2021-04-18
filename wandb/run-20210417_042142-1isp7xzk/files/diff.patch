@@ -128,7 +128,7 @@ index 32c2b91..0ad71fd 100644
 -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
 +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
      parser.add_argument(
-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
      )
 @@ -217,7 +235,6 @@ if __name__ == "__main__":
  

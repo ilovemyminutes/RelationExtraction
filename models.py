@@ -51,7 +51,6 @@ class VanillaBert(nn.Module):
         self.backbone = self.load_bert(
             model_type=model_type,
             pretrained_type=pretrained_type,
-            num_labels=num_labels,
         )
         self.layernorm = nn.LayerNorm(768)  # 768: output length of backbone, BERT
         self.dropout = nn.Dropout()

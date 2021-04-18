@@ -1,0 +1,3269 @@
+diff --git a/config.py b/config.py
+index 77f2061..e98adcc 100644
+--- a/config.py
++++ b/config.py
+@@ -75,4 +75,5 @@ class ModelType:
+ 
+ @dataclass
+ class PreTrainedType:
+-    BertMultiLingual: str = "bert-base-multilingual-cased"
+\ No newline at end of file
++    MultiLingual: str = "bert-base-multilingual-cased"
++    BaseUncased: str= "bert-base-uncased"
+\ No newline at end of file
+diff --git a/dataset.py b/dataset.py
+index 240db38..29612a4 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -2,7 +2,6 @@ import random
+ from typing import Tuple, Dict
+ import pandas as pd
+ import torch
+-from torch.functional import Tensor
+ from torch.utils.data import Dataset, DataLoader
+ from torch.utils.data.sampler import SubsetRandomSampler
+ from transformers.utils import logging
+diff --git a/models.py b/models.py
+index f66e4c0..f9a6bb5 100644
+--- a/models.py
++++ b/models.py
+@@ -7,7 +7,7 @@ from dataset import REDataset, split_train_test_loader
+ 
+ def load_model(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     pooler_idx: int = 0,  # get last hidden state from CLS
+@@ -40,14 +40,14 @@ def load_model(
+ class VanillaBert(nn.Module):
+     def __init__(
+         self,
+-        model_type: str,
+-        pretrained_type: str,
++        model_type: str=ModelType.SequenceClf,
++        pretrained_type: str=PreTrainedType.MultiLingual,
+         num_labels: int = Config.NumClasses,
+         pooler_idx: int = 0,
+     ):
+         super(VanillaBert, self).__init__()
+         # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
+-        self.idx = 0 if pooler_idx in ["cls", 0] else pooler_idx
++        self.idx = 0 if pooler_idx == 0 else pooler_idx
+         self.backbone = self.load_bert(
+             model_type=model_type,
+             pretrained_type=pretrained_type,
+@@ -73,12 +73,12 @@ class VanillaBert(nn.Module):
+ 
+     @staticmethod
+     def load_bert(model_type, pretrained_type, num_labels):
+-        bert_config = BertConfig.from_pretrained(pretrained_type)
+-        bert_config.num_labels = num_labels
++        # bert_config = BertConfig.from_pretrained(pretrained_type)
++        # bert_config.num_labels = num_labels
+ 
+         if model_type == ModelType.SequenceClf:
+             model = BertForSequenceClassification.from_pretrained(
+-                pretrained_type, config=bert_config
++                pretrained_type
+             )
+             model = model.bert
+ 
+diff --git a/notebooks/Debug - Model Inference.ipynb b/notebooks/Debug - Model Inference.ipynb
+index 72d24fa..0af9f40 100644
+--- a/notebooks/Debug - Model Inference.ipynb	
++++ b/notebooks/Debug - Model Inference.ipynb	
+@@ -37,1177 +37,121 @@
+     "\n",
+     "from config import Config, ModelType, PreTrainedType\n",
+     "from transformers import BertModel, BertConfig, BertForSequenceClassification\n",
+-    "from models import load_model\n",
+-    "from dataset import REDataset, split_train_test_loader, LabelEncoder\n",
+-    "from utils import set_seed\n",
+-    "from inference import get_model_pretrained_type"
++    "from models import load_model, VanillaBert\n",
++    "from dataset import REDataset\n",
++    "from utils import set_seed"
+    ]
+   },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": []
+-  },
+   {
+    "cell_type": "code",
+    "execution_count": 2,
+    "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "'../saved_models/VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth'"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 2
+-    }
+-   ],
+-   "source": [
+-    "MODELNAME = \"VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth\"\n",
+-    "LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)\n",
+-    "LOAD_STATE_DICT"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 44,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "stream",
+-     "name": "stdout",
+-     "text": [
+-      "Load Tokenizer...\tdone!\n",
+-      "Load raw data...\tdone!\n",
+-      "Apply Tokenization...\tdone!\n"
+-     ]
+-    }
+-   ],
+-   "source": [
+-    "dataset = REDataset(Config.Train, device='cpu')"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 49,
+-   "metadata": {},
+    "outputs": [],
+    "source": [
+-    "dataloader = DataLoader(dataset, batch_size=1)\n",
+-    "samples = []\n",
+-    "for idx, (sents, labels) in enumerate(dataloader):\n",
+-    "    samples.append((sents, labels))\n",
+-    "    if idx > 3:\n",
+-    "        break"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 46,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "('VanillaBert', 'bert-base-multilingual-cased')"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 46
+-    }
+-   ],
+-   "source": [
+-    "model_type, pretrained_type = get_model_pretrained_type(LOAD_STATE_DICT)\n",
+-    "model_type, pretrained_type\n"
++    "LOAD = \"../saved_models/VanillaBert_bert-base-multilingual-cased_20210418160912/VanillaBert_bert-base-multilingual-cased_ep(02)acc(0.4878)loss(0.0048)id(20210418160912).pth\"\n"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 68,
++   "execution_count": 5,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "stream",
+-     "name": "stdout",
++     "name": "stderr",
+      "text": [
+-      "Load Model...\tSome weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
++      "Some weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
+       "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+       "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
+       "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
+       "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n",
+-      "done!\n"
++      "CUDA\n"
+      ]
+-    },
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "VanillaBert(\n",
+-       "  (backbone): BertModel(\n",
+-       "    (embeddings): BertEmbeddings(\n",
+-       "      (word_embeddings): Embedding(119547, 768, padding_idx=0)\n",
+-       "      (position_embeddings): Embedding(512, 768)\n",
+-       "      (token_type_embeddings): Embedding(2, 768)\n",
+-       "      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "      (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "    )\n",
+-       "    (encoder): BertEncoder(\n",
+-       "      (layer): ModuleList(\n",
+-       "        (0): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (1): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (2): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (3): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (4): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (5): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (6): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (7): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (8): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (9): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (10): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (11): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "      )\n",
+-       "    )\n",
+-       "    (pooler): BertPooler(\n",
+-       "      (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "      (activation): Tanh()\n",
+-       "    )\n",
+-       "  )\n",
+-       "  (layernorm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)\n",
+-       "  (dropout): Dropout(p=0.5, inplace=False)\n",
+-       "  (relu): ReLU()\n",
+-       "  (linear): Linear(in_features=768, out_features=42, bias=True)\n",
+-       ")"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 68
+     }
+    ],
+    "source": [
+-    "model_notrain = load_model(\n",
+-    "        model_type, pretrained_type, 42, None, 0\n",
+-    "    )\n",
+-    "model_notrain.eval()"
++    "model = VanillaBert()\n",
++    "model.train()\n",
++    "model.cuda()\n",
++    "print('CUDA')"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 69,
++   "execution_count": 6,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+-      "Load Model...\tSome weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
+-      "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+-      "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
+-      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
+-      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n",
+-      "Loaded pretrained weights from ../saved_models/VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth\tdone!\n"
+-     ]
+-    },
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "VanillaBert(\n",
+-       "  (backbone): BertModel(\n",
+-       "    (embeddings): BertEmbeddings(\n",
+-       "      (word_embeddings): Embedding(119547, 768, padding_idx=0)\n",
+-       "      (position_embeddings): Embedding(512, 768)\n",
+-       "      (token_type_embeddings): Embedding(2, 768)\n",
+-       "      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "      (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "    )\n",
+-       "    (encoder): BertEncoder(\n",
+-       "      (layer): ModuleList(\n",
+-       "        (0): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (1): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (2): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (3): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (4): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (5): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (6): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (7): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (8): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (9): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (10): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (11): BertLayer(\n",
+-       "          (attention): BertAttention(\n",
+-       "            (self): BertSelfAttention(\n",
+-       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "            (output): BertSelfOutput(\n",
+-       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "              (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "            )\n",
+-       "          )\n",
+-       "          (intermediate): BertIntermediate(\n",
+-       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "          )\n",
+-       "          (output): BertOutput(\n",
+-       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "      )\n",
+-       "    )\n",
+-       "    (pooler): BertPooler(\n",
+-       "      (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "      (activation): Tanh()\n",
+-       "    )\n",
+-       "  )\n",
+-       "  (layernorm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)\n",
+-       "  (dropout): Dropout(p=0.5, inplace=False)\n",
+-       "  (relu): ReLU()\n",
+-       "  (linear): Linear(in_features=768, out_features=42, bias=True)\n",
+-       ")"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 69
+-    }
+-   ],
+-   "source": [
+-    "model_train = load_model(\n",
+-    "        model_type, pretrained_type, 42, LOAD_STATE_DICT, 0\n",
+-    "    )\n",
+-    "model_train.eval()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 62,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "outputs_train = model_train(**samples[0][0])\n",
+-    "outputs_notrain = model_notrain(**samples[0][0])"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 67,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([[ 2.0303, -2.0521,  0.0486, -2.8666,  0.5721, -0.6975, -1.0317, -1.2938,\n",
+-       "         -1.2359, -2.1209,  0.3462, -2.5318, -2.6618, -4.2904, -2.7768, -0.6498,\n",
+-       "         -2.4126, -0.6031, -5.8365, -7.3803, -1.3323, -1.7524, -2.8986, -2.3324,\n",
+-       "         -2.0022, -2.6056, -5.1314, -2.4091, -4.1040, -4.7028, -4.0969, -3.9300,\n",
+-       "         -2.8448, -1.8718, -3.5850, -3.0131, -3.9261, -5.8131, -4.1087, -4.2241,\n",
+-       "         -7.2353, -4.6720]], grad_fn=<AddmmBackward>)"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 67
+-    }
+-   ],
+-   "source": [
+-    "IDX = 1\n",
+-    "SENT = 0\n",
+-    "LABEL = 1\n",
+-    "outputs_train = model_train(**samples[IDX][SENT])\n",
+-    "outputs_train"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 28,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "{'input_ids': tensor([[  101, 50266, 11489,  ...,     0,     0,     0],\n",
+-       "         [  101,  9428, 41521,  ...,     0,     0,     0],\n",
+-       "         [  101, 68495, 37905,  ...,     0,     0,     0],\n",
+-       "         ...,\n",
+-       "         [  101,  9746, 21611,  ...,     0,     0,     0],\n",
+-       "         [  101, 53519, 24756,  ...,     0,     0,     0],\n",
+-       "         [  101,  9735, 29935,  ..., 10622,  9460,   102]]),\n",
+-       " 'token_type_ids': tensor([[0, 0, 0,  ..., 0, 0, 0],\n",
+-       "         [0, 0, 0,  ..., 0, 0, 0],\n",
+-       "         [0, 0, 0,  ..., 0, 0, 0],\n",
+-       "         ...,\n",
+-       "         [0, 0, 0,  ..., 0, 0, 0],\n",
+-       "         [0, 0, 0,  ..., 0, 0, 0],\n",
+-       "         [0, 0, 0,  ..., 0, 0, 0]]),\n",
+-       " 'attention_mask': tensor([[1, 1, 1,  ..., 0, 0, 0],\n",
+-       "         [1, 1, 1,  ..., 0, 0, 0],\n",
+-       "         [1, 1, 1,  ..., 0, 0, 0],\n",
+-       "         ...,\n",
+-       "         [1, 1, 1,  ..., 0, 0, 0],\n",
+-       "         [1, 1, 1,  ..., 0, 0, 0],\n",
+-       "         [1, 1, 1,  ..., 1, 1, 1]])}"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 28
+-    }
+-   ],
+-   "source": [
+-    "sents"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 29,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([17,  0,  6,  2,  8,  0, 17,  3, 10,  0,  4,  0, 16,  4,  0,  0,  0,  0,\n",
+-       "         4,  0,  0,  7, 17,  2,  6,  0, 10,  0, 10, 17,  8,  0, 15, 15,  5, 25,\n",
+-       "         0,  0,  5,  0,  0,  8,  0,  6,  0, 15,  0,  0,  0,  4, 10,  4,  0, 10,\n",
+-       "         0, 10, 15,  0,  0,  0,  4,  0, 10,  0])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 29
+-    }
+-   ],
+-   "source": [
+-    "labels"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 43,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([ 2.1118, -1.8216, -0.0141, -2.6182,  0.4168, -1.0313, -1.0126, -1.1142,\n",
+-       "        -1.4230, -2.1413,  0.5483, -2.2418, -3.0003, -4.3309, -2.6733, -0.6005,\n",
+-       "        -2.5336, -0.9895, -5.8246, -6.6203, -1.3131, -1.8837, -2.7640, -2.0999,\n",
+-       "        -2.1457, -2.2759, -4.5296, -2.4411, -4.1593, -5.0778, -4.3852, -3.6810,\n",
+-       "        -2.8476, -2.0332, -3.6978, -3.2684, -4.1173, -5.7310, -3.9672, -4.4849,\n",
+-       "        -7.0915, -5.0775], grad_fn=<SelectBackward>)"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 43
+-    }
+-   ],
+-   "source": [
+-    "outputs_train[8]"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 32,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
+-       "        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
+-       "        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 32
+-    }
+-   ],
+-   "source": [
+-    "# 학습한 경우\n",
+-    "F.softmax(outputs_train, dim=1).argmax(dim=1)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 33,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([27, 41, 11, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 11, 27,\n",
+-       "        27, 16, 27, 27, 27, 27, 27, 27, 27, 31, 27, 27, 27, 11, 11, 31, 11, 27,\n",
+-       "        11, 27, 27, 27, 11, 27, 27, 11, 27, 27, 27, 27, 27, 27, 27, 27, 16, 15,\n",
+-       "        27, 27, 27, 11, 11, 11, 27, 27, 27, 39])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 33
+-    }
+-   ],
+-   "source": [
+-    "# 학습하지 않은 경우\n",
+-    "F.softmax(outputs_notrain, dim=1).argmax(dim=1)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 2,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "LOAD = \"../saved_models/BertModel_bert-base-multilingual-cased_20210417144420/BertModel_bert-base-multilingual-cased_ep(00)acc(0.5004)loss(0.0108)id(20210417144420).pth\""
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 10,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "stream",
+-     "name": "stderr",
+-     "text": [
+-      "Some weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
+-      "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+-      "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
+-      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
+-      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n"
++      "Load raw data...\tpreprocessing for 'Base'...\tdone!\n",
++      "Load Tokenizer...\tdone!\n",
++      "Apply Tokenization...\tdone!\n"
+      ]
+     }
+    ],
+    "source": [
+-    "bert_config = BertConfig.from_pretrained(PreTrainedType.BertMultiLingual)\n",
+-    "bert_config.num_labels = 42\n",
+-    "# bert_config.output_hidden_states = True\n",
+-    "model = BertForSequenceClassification.from_pretrained(PreTrainedType.BertMultiLingual, config=bert_config)"
++    "dataset = REDataset()\n",
++    "loader = DataLoader(dataset, batch_size=4)\n",
++    "for sents, labels in loader:\n",
++    "    break"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 11,
++   "execution_count": 16,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+-      "Seed set as 42\n",
++      "Load raw data...\tpreprocessing for 'Base'...\tdone!\n",
+       "Load Tokenizer...\tdone!\n",
+-      "Load raw data...\tdone!\n",
+       "Apply Tokenization...\tdone!\n"
+      ]
+     }
+    ],
+    "source": [
+-    "set_seed()\n",
+     "dataset = REDataset(device='cpu')\n",
+-    "train_loader, valid_loader = split_train_test_loader(dataset, test_size=0.25)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 12,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "for sents, labels in valid_loader:\n",
+-    "    break"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 18,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "hidden = outputs.last_hidden_state"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 22,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "torch.Size([512, 768])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 22
+-    }
+-   ],
+-   "source": [
+-    "IDX = 0\n",
+-    "hidden[:, IDX, :].size()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 45,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "class temp(nn.Module):\n",
+-    "    def __init__(self, model=model):\n",
+-    "        super(temp, self).__init__()\n",
+-    "        self.bert = model.bert\n",
+-    "\n",
+-    "    def forward(self, input_ids, token_type_ids, attention_mask):\n",
+-    "        return self.bert(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 49,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "vanilla = temp(model=model)\n",
+-    "optimizer = optim.Adam(vanilla.parameters(), lr=0.5)\n",
+-    "criterion = nn.CrossEntropyLoss()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 33,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "for i in bert.modules():\n",
++    "loader = DataLoader(dataset, batch_size=4)\n",
++    "for sents, labels in loader:\n",
+     "    break"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 50,
++   "execution_count": 17,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+-    "output = vanilla(**sents)"
++    "output = model(**sents)"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 56,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "torch.Size([512, 128, 768])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 56
+-    }
+-   ],
+-   "source": [
+-    "output.last_hidden_state.size()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 98,
++   "execution_count": 18,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "execute_result",
+      "data": {
+       "text/plain": [
+-       "odict_keys(['last_hidden_state', 'pooler_output', 'hidden_states'])"
++       "tensor([ 3.0339, -0.9956,  1.1845, -1.6719,  1.1316, -0.4079, -0.2402, -0.1418,\n",
++       "        -0.2829, -0.6029,  1.4982, -1.3011, -1.3446, -3.0906, -1.6963,  0.2100,\n",
++       "        -2.4108, -0.4741, -3.5432, -3.7005, -0.2201, -0.9757, -1.1497, -1.2520,\n",
++       "        -0.4628, -1.2996, -3.5494, -2.0420, -3.2510, -3.6002, -2.9700, -2.8292,\n",
++       "        -2.2531, -0.9407, -2.4380, -2.0726, -3.2703, -4.8750, -2.4797, -2.8526,\n",
++       "        -4.9266, -3.7581], grad_fn=<SelectBackward>)"
+       ]
+      },
+      "metadata": {},
+-     "execution_count": 98
++     "execution_count": 18
+     }
+    ],
+    "source": [
+-    "output.keys()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 18,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "class VanillaBert(nn.Module):\n",
+-    "    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.BertMultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls', load_state_dict=None):\n",
+-    "        super(VanillaBert, self).__init__()\n",
+-    "        print(model_type)\n",
+-    "        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.\n",
+-    "        self.idx = 0 if pooler_idx in ['cls', 0] else pooler_idx \n",
+-    "        self.backbone = self.load_bert(model_type=model_type, pretrained_type=pretrained_type, num_labels=num_labels)\n",
+-    "        self.layernorm = nn.LayerNorm(768) # 768: output length of BERT, or backbone\n",
+-    "        self.dropout = nn.Dropout()\n",
+-    "        self.relu = nn.ReLU()\n",
+-    "        self.linear = nn.Linear(in_features=768, out_features=num_labels)\n",
+-    "\n",
+-    "    def forward(self, input_ids, token_type_ids, attention_mask):\n",
+-    "        x = self.backbone(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask)\n",
+-    "        x = x.output_hidden_state[:, self.idx, :]\n",
+-    "        x = self.layernorm(x)\n",
+-    "        x = self.dropout(x)\n",
+-    "        x = self.relu(x)\n",
+-    "        output = self.linear(x)\n",
+-    "        return output\n",
+-    "\n",
+-    "    @staticmethod\n",
+-    "    def load_bert(model_type, pretrained_type, num_labels):\n",
+-    "        bert_config = BertConfig.from_pretrained(pretrained_type)\n",
+-    "        bert_config.num_labels = num_labels\n",
+-    "\n",
+-    "        if model_type == ModelType.SequenceClf:    \n",
+-    "            model = BertForSequenceClassification.from_pretrained(pretrained_type, config=bert_config)\n",
+-    "            model = model.bert\n",
+-    "            \n",
+-    "        elif model_type == ModelType.Base:\n",
+-    "            raise NotImplementedError()\n",
+-    "\n",
+-    "        return model"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 19,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "stream",
+-     "name": "stdout",
+-     "text": [
+-      "BertForSequenceClassification\n",
+-      "Some weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
+-      "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+-      "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
+-      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
+-      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n"
+-     ]
+-    }
+-   ],
+-   "source": [
+-    "model = VanillaBert()"
++    "output[0]"
+    ]
+   },
+   {
+@@ -1219,299 +163,12 @@
+      "output_type": "execute_result",
+      "data": {
+       "text/plain": [
+-       "BertModel(\n",
+-       "  (embeddings): BertEmbeddings(\n",
+-       "    (word_embeddings): Embedding(119547, 768, padding_idx=0)\n",
+-       "    (position_embeddings): Embedding(512, 768)\n",
+-       "    (token_type_embeddings): Embedding(2, 768)\n",
+-       "    (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "    (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "  )\n",
+-       "  (encoder): BertEncoder(\n",
+-       "    (layer): ModuleList(\n",
+-       "      (0): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (1): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (2): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (3): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (4): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (5): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (6): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (7): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (8): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (9): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (10): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "      (11): BertLayer(\n",
+-       "        (attention): BertAttention(\n",
+-       "          (self): BertSelfAttention(\n",
+-       "            (query): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (key): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (value): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "          (output): BertSelfOutput(\n",
+-       "            (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "            (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "          )\n",
+-       "        )\n",
+-       "        (intermediate): BertIntermediate(\n",
+-       "          (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
+-       "        )\n",
+-       "        (output): BertOutput(\n",
+-       "          (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
+-       "          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
+-       "          (dropout): Dropout(p=0.1, inplace=False)\n",
+-       "        )\n",
+-       "      )\n",
+-       "    )\n",
+-       "  )\n",
+-       "  (pooler): BertPooler(\n",
+-       "    (dense): Linear(in_features=768, out_features=768, bias=True)\n",
+-       "    (activation): Tanh()\n",
+-       "  )\n",
+-       ")"
++       "tensor([ 3.0340, -0.9956,  1.1845, -1.6719,  1.1316, -0.4079, -0.2402, -0.1418,\n",
++       "        -0.2829, -0.6029,  1.4982, -1.3011, -1.3446, -3.0906, -1.6963,  0.2100,\n",
++       "        -2.4108, -0.4741, -3.5432, -3.7005, -0.2201, -0.9757, -1.1497, -1.2520,\n",
++       "        -0.4628, -1.2996, -3.5494, -2.0420, -3.2510, -3.6002, -2.9700, -2.8292,\n",
++       "        -2.2531, -0.9407, -2.4380, -2.0726, -3.2703, -4.8750, -2.4797, -2.8526,\n",
++       "        -4.9266, -3.7581], grad_fn=<SelectBackward>)"
+       ]
+      },
+      "metadata": {},
+@@ -1519,246 +176,58 @@
+     }
+    ],
+    "source": [
+-    "model.backbone"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 84,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "temp = vanilla.bert.encoder.layer[0].intermediate.dense.parameters()\n",
+-    "par = list(temp)\n",
+-    "par[0].grad"
++    "output[2]"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 86,
++   "execution_count": 25,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+-    "par = list(temp)"
++    "temp = BertConfig.from_pretrained(\"bert-base-uncased\")"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 90,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "par[0].grad"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 63,
++   "execution_count": 26,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "execute_result",
+      "data": {
+       "text/plain": [
+-       "tensor(6.5733, grad_fn=<NllLossBackward>)"
++       "BertConfig {\n",
++       "  \"architectures\": [\n",
++       "    \"BertForMaskedLM\"\n",
++       "  ],\n",
++       "  \"attention_probs_dropout_prob\": 0.1,\n",
++       "  \"gradient_checkpointing\": false,\n",
++       "  \"hidden_act\": \"gelu\",\n",
++       "  \"hidden_dropout_prob\": 0.1,\n",
++       "  \"hidden_size\": 768,\n",
++       "  \"initializer_range\": 0.02,\n",
++       "  \"intermediate_size\": 3072,\n",
++       "  \"layer_norm_eps\": 1e-12,\n",
++       "  \"max_position_embeddings\": 512,\n",
++       "  \"model_type\": \"bert\",\n",
++       "  \"num_attention_heads\": 12,\n",
++       "  \"num_hidden_layers\": 12,\n",
++       "  \"pad_token_id\": 0,\n",
++       "  \"position_embedding_type\": \"absolute\",\n",
++       "  \"transformers_version\": \"4.2.0\",\n",
++       "  \"type_vocab_size\": 2,\n",
++       "  \"use_cache\": true,\n",
++       "  \"vocab_size\": 30522\n",
++       "}"
+       ]
+      },
+      "metadata": {},
+-     "execution_count": 63
++     "execution_count": 26
+     }
+    ],
+    "source": [
+-    "loss = criterion(output.pooler_output, labels)\n",
+-    "loss"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 92,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "optimizer.zero_grad()\n",
+-    "loss.backward()\n",
+-    "optimizer.step()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 93,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([[-1.3005e-05, -2.9100e-06,  1.3296e-05,  ..., -1.7892e-06,\n",
+-       "         -3.8926e-06, -1.2175e-05],\n",
+-       "        [-1.1622e-05,  1.5063e-06,  3.8757e-05,  ..., -9.9145e-05,\n",
+-       "         -2.8575e-05,  4.5431e-05],\n",
+-       "        [ 3.4346e-05,  3.4284e-05,  3.3967e-05,  ..., -1.9772e-05,\n",
+-       "         -3.3613e-06,  5.6124e-06],\n",
+-       "        ...,\n",
+-       "        [-4.9324e-06,  1.1256e-04, -6.2499e-05,  ..., -4.2833e-05,\n",
+-       "          1.2524e-05,  4.7053e-05],\n",
+-       "        [ 4.7357e-05, -9.0478e-06, -2.4913e-05,  ...,  7.1708e-06,\n",
+-       "          9.2066e-06, -3.8083e-05],\n",
+-       "        [ 1.9760e-06,  1.0706e-05,  1.1165e-04,  ..., -7.2068e-05,\n",
+-       "          4.8590e-05,  1.5547e-05]])"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 93
+-    }
+-   ],
+-   "source": [
+-    "temp = vanilla.bert.encoder.layer[0].intermediate.dense.parameters()\n",
+-    "par = list(temp)\n",
+-    "par[0].grad"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 11,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "outputs = model(**sents)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 17,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "preds = F.softmax(outputs.pooler_output, dim=1)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 19,
+-   "metadata": {},
+-   "outputs": [
+-    {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "tensor([0.0080, 0.0080, 0.0080, 0.0080, 0.0080, 0.0080, 0.0080, 0.0080, 0.0080,\n",
+-       "        0.0080, 0.0080, 0.0079, 0.0070, 0.0011, 0.0078, 0.0080, 0.0012, 0.0080,\n",
+-       "        0.0011, 0.0011, 0.0080, 0.0080, 0.0080, 0.0079, 0.0080, 0.0077, 0.0011,\n",
+-       "        0.0080, 0.0011, 0.0011, 0.0011, 0.0011, 0.0012, 0.0079, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0012, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011,\n",
+-       "        0.0011, 0.0011, 0.0011], grad_fn=<SelectBackward>)"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 19
+-    }
+-   ],
+-   "source": [
+-    "preds[0]"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "model_type: str = ModelType.SequenceClf,\n",
+-    "pretrained_type: str = PreTrainedType.BertMultiLingual,\n",
+-    "num_classes: int = Config.NumClasses,\n",
+-    "load_state_dict: str = None,"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "load_model()"
++    "temp"
+    ]
+   }
+  ]
+diff --git a/notebooks/Hands-on-BERT.ipynb b/notebooks/Hands-on-BERT.ipynb
+index e0cd67b..0aeec09 100644
+--- a/notebooks/Hands-on-BERT.ipynb
++++ b/notebooks/Hands-on-BERT.ipynb
+@@ -50,8 +50,8 @@
+     }
+    ],
+    "source": [
+-    "model = BertForMaskedLM.from_pretrained(PreTrainedType.BertMultiLingual)\n",
+-    "tokenizer = AutoTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)"
++    "model = BertForMaskedLM.from_pretrained(PreTrainedType.MultiLingual)\n",
++    "tokenizer = AutoTokenizer.from_pretrained(PreTrainedType.MultiLingual)"
+    ]
+   },
+   {
+diff --git a/notebooks/Sketch - Model.ipynb b/notebooks/Sketch - Model.ipynb
+index 1beb5ca..d7a7e29 100644
+--- a/notebooks/Sketch - Model.ipynb	
++++ b/notebooks/Sketch - Model.ipynb	
+@@ -73,7 +73,7 @@
+     }
+    ],
+    "source": [
+-    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)\n",
++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)\n",
+     "model.cuda()\n",
+     "print('CUDA')"
+    ]
+@@ -165,8 +165,8 @@
+    "metadata": {},
+    "outputs": [],
+    "source": [
+-    "tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)\n",
+-    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)\n",
++    "tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)\n",
++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)\n",
+     "inputs = tokenizer(\"Hello, my dog is cute\", return_tensors=\"pt\")\n",
+     "outputs = model(**inputs)"
+    ]
+diff --git a/notebooks/Sketch - Tokenizer.ipynb b/notebooks/Sketch - Tokenizer.ipynb
+index 14352e4..0dfcf76 100644
+--- a/notebooks/Sketch - Tokenizer.ipynb	
++++ b/notebooks/Sketch - Tokenizer.ipynb	
+@@ -23,7 +23,7 @@
+  "cells": [
+   {
+    "cell_type": "code",
+-   "execution_count": 1,
++   "execution_count": 4,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+@@ -37,7 +37,18 @@
+     "from dataset import load_data, REDataset\n",
+     "from config import Config, PreTrainedType, PreProcessType\n",
+     "from tokenization import SpecialToken\n",
+-    "from utils import load_pickle"
++    "from utils import load_pickle\n",
++    "from models import VanillaBert"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": null,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "LOAD = \"../saved_models/VanillaBert_bert-base-multilingual-cased_20210418160912/VanillaBert_bert-base-multilingual-cased_ep(02)acc(0.4878)loss(0.0048)id(20210418160912).pth\"\n",
++    "model = VanillaBert()\n"
+    ]
+   },
+   {
+@@ -318,7 +329,7 @@
+    "metadata": {},
+    "outputs": [],
+    "source": [
+-    "tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)"
++    "tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)"
+    ]
+   },
+   {
+diff --git a/tokenization.py b/tokenization.py
+index 7b33185..21d4998 100644
+--- a/tokenization.py
++++ b/tokenization.py
+@@ -34,7 +34,7 @@ def load_tokenizer(type: str = PreProcessType.Base):
+     """
+     print("Load Tokenizer...", end="\t")
+     if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
+-        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)
++        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
+     else:
+         raise NotImplementedError
+     print("done!")
+diff --git a/train.py b/train.py
+index 090e248..e51c91b 100644
+--- a/train.py
++++ b/train.py
+@@ -20,12 +20,12 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+-    tokenization_type: str = PreProcessType.Base,
++    preprocess_type: str = PreProcessType.Base,
+     epochs: int = Config.Epochs,
+     valid_size: float = Config.ValidSize,
+     train_batch_size: int = Config.Batch32,
+@@ -43,7 +43,7 @@ def train(
+ 
+     # load data
+     dataset = REDataset(
+-        root=data_root, tokenization_type=tokenization_type, device=device
++        root=data_root, preprocess_type=preprocess_type, device=device
+     )
+     if valid_size == 0:
+         is_valid = False # validation flag
+@@ -240,13 +240,13 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+     parser.add_argument("--data-root", type=str, default=Config.Train)
+-    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
++    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
+     parser.add_argument("--epochs", type=int, default=Config.Epochs)
+     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
+     parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
+diff --git a/wandb/latest-run b/wandb/latest-run
+index ca43bec..5325c7a 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210417_091840-7dmyj8nv
+\ No newline at end of file
++run-20210418_074452-23w4msrd
+\ No newline at end of file
+diff --git a/wandb/run-20210416_185943-1nts96q3/files/code/train.py b/wandb/run-20210416_185943-1nts96q3/files/code/train.py
+index e54d5ac..25088e4 100644
+--- a/wandb/run-20210416_185943-1nts96q3/files/code/train.py
++++ b/wandb/run-20210416_185943-1nts96q3/files/code/train.py
+@@ -19,7 +19,7 @@ VALID_CYCLE = 100
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -195,7 +195,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_190034-3dxew85h/files/code/train.py b/wandb/run-20210416_190034-3dxew85h/files/code/train.py
+index 458357f..5fc00e2 100644
+--- a/wandb/run-20210416_190034-3dxew85h/files/code/train.py
++++ b/wandb/run-20210416_190034-3dxew85h/files/code/train.py
+@@ -19,7 +19,7 @@ VALID_CYCLE = 100
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -195,7 +195,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_190318-m4rz970f/files/code/train.py b/wandb/run-20210416_190318-m4rz970f/files/code/train.py
+index a4e8a42..2ca1301 100644
+--- a/wandb/run-20210416_190318-m4rz970f/files/code/train.py
++++ b/wandb/run-20210416_190318-m4rz970f/files/code/train.py
+@@ -22,7 +22,7 @@ VALID_CYCLE = 100
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -198,7 +198,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_190945-14py9lif/files/code/train.py b/wandb/run-20210416_190945-14py9lif/files/code/train.py
+index dd89584..cd616d4 100644
+--- a/wandb/run-20210416_190945-14py9lif/files/code/train.py
++++ b/wandb/run-20210416_190945-14py9lif/files/code/train.py
+@@ -21,7 +21,7 @@ VALID_CYCLE = 100
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -199,7 +199,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_192014-2ucqo3ej/files/code/train.py b/wandb/run-20210416_192014-2ucqo3ej/files/code/train.py
+index eeb9896..4263e75 100644
+--- a/wandb/run-20210416_192014-2ucqo3ej/files/code/train.py
++++ b/wandb/run-20210416_192014-2ucqo3ej/files/code/train.py
+@@ -21,7 +21,7 @@ VALID_CYCLE = 100
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -199,7 +199,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_192518-1czp4elw/files/code/train.py b/wandb/run-20210416_192518-1czp4elw/files/code/train.py
+index 96cc5b3..9eebe9f 100644
+--- a/wandb/run-20210416_192518-1czp4elw/files/code/train.py
++++ b/wandb/run-20210416_192518-1czp4elw/files/code/train.py
+@@ -19,7 +19,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -197,7 +197,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210416_192757-e4hijb51/files/code/train.py b/wandb/run-20210416_192757-e4hijb51/files/code/train.py
+index d307ddb..a3f95a3 100644
+--- a/wandb/run-20210416_192757-e4hijb51/files/code/train.py
++++ b/wandb/run-20210416_192757-e4hijb51/files/code/train.py
+@@ -19,7 +19,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -197,7 +197,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_040345-28rz9lfp/files/code/train.py b/wandb/run-20210417_040345-28rz9lfp/files/code/train.py
+index 169c1db..39b96cd 100644
+--- a/wandb/run-20210417_040345-28rz9lfp/files/code/train.py
++++ b/wandb/run-20210417_040345-28rz9lfp/files/code/train.py
+@@ -19,7 +19,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -198,7 +198,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_040345-28rz9lfp/files/diff.patch b/wandb/run-20210417_040345-28rz9lfp/files/diff.patch
+index 78b2022..ccabfc1 100644
+--- a/wandb/run-20210417_040345-28rz9lfp/files/diff.patch
++++ b/wandb/run-20210417_040345-28rz9lfp/files/diff.patch
+@@ -30,34 +30,34 @@ index 32c2b91..cfd32ea 100644
+ --- a/train.py
+ +++ b/train.py
+ @@ -113,7 +113,7 @@ def train(
+-                 valid_eval, valid_loss = validate(
+-                     model=model, valid_loader=valid_loader, criterion=criterion
+-                 )
+--                verbose(phase="Valid", eval=train_eval, loss=train_loss)
+-+                verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
+-                 verbose(phase="Train", eval=train_eval, loss=train_loss)
+- 
+-                 if epoch == 0:
++                 valid_eval, valid_loss = validate(
++                     model=model, valid_loader=valid_loader, criterion=criterion
++                 )
++-                verbose(phase="Valid", eval=train_eval, loss=train_loss)
+++                verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
++                 verbose(phase="Train", eval=train_eval, loss=train_loss)
++ 
++                 if epoch == 0:
+ @@ -193,9 +193,10 @@ def verbose(phase: str, eval: dict, loss: float):
+- 
+- if __name__ == "__main__":
+-     LOAD_STATE_DICT = None
+-+    TIMESTAMP = get_timestamp()
+- 
+-     parser = argparse.ArgumentParser()
+--    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+-+    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+-     parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+-     )
++ 
++ if __name__ == "__main__":
++     LOAD_STATE_DICT = None
+++    TIMESTAMP = get_timestamp()
++ 
++     parser = argparse.ArgumentParser()
++-    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+++    parser.add_argument("--model-type", type=str, default=ModelType.Base)
++     parser.add_argument(
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
++     )
+ @@ -217,7 +218,6 @@ if __name__ == "__main__":
+- 
+-     # register logs to wandb
+-     args = parser.parse_args()
+--    TIMESTAMP = get_timestamp()
+-     name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+-     run = wandb.init(project="pstage-klue", name=name, reinit=True)
+-     wandb.config.update(args)
++ 
++     # register logs to wandb
++     args = parser.parse_args()
++-    TIMESTAMP = get_timestamp()
++     name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
++     run = wandb.init(project="pstage-klue", name=name, reinit=True)
++     wandb.config.update(args)
+ diff --git a/wandb/latest-run b/wandb/latest-run
+ index 25c39ef..9f0f456 120000
+ --- a/wandb/latest-run
+diff --git a/wandb/run-20210417_042142-1isp7xzk/files/code/train.py b/wandb/run-20210417_042142-1isp7xzk/files/code/train.py
+index ec9d0c8..444af33 100644
+--- a/wandb/run-20210417_042142-1isp7xzk/files/code/train.py
++++ b/wandb/run-20210417_042142-1isp7xzk/files/code/train.py
+@@ -19,7 +19,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -215,7 +215,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_042142-1isp7xzk/files/diff.patch b/wandb/run-20210417_042142-1isp7xzk/files/diff.patch
+index e8e57ff..edbb714 100644
+--- a/wandb/run-20210417_042142-1isp7xzk/files/diff.patch
++++ b/wandb/run-20210417_042142-1isp7xzk/files/diff.patch
+@@ -1,35 +1,35 @@
+-diff --git a/config.py b/config.py
+-index 522a3d0..befa2bd 100644
+---- a/config.py
+-+++ b/config.py
+-@@ -6,7 +6,6 @@ import torch
+- TRAIN = "./input/data/train/train.tsv"
+- TEST = "./input/data/test/test.tsv"
+- LABEL = "./input/data/label_type.pkl"
+--SAVEPATH = "./saved_models"
+- LOGS = "./logs"
+- 
+- DOT = "."
+-@@ -20,12 +19,11 @@ class Config:
+- 
+-     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
+-     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
+--    ValidSize: float = 0.2
+-+    ValidSize: float = 0.1
+-     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
+--    SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
+-     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
+-     NumClasses: int = 42
+--    Epochs: int = 20
+-+    Epochs: int = 10
+- 
+-     Batch8:int = 8
+-     Batch16: int = 16
+-diff --git a/train.py b/train.py
+-index 32c2b91..0ad71fd 100644
+---- a/train.py
+-+++ b/train.py
+-@@ -60,9 +60,16 @@ def train(
++diff --git a/config.py b/config.py
++index 522a3d0..befa2bd 100644
++--- a/config.py
+++++ b/config.py
++@@ -6,7 +6,6 @@ import torch
++ TRAIN = "./input/data/train/train.tsv"
++ TEST = "./input/data/test/test.tsv"
++ LABEL = "./input/data/label_type.pkl"
++-SAVEPATH = "./saved_models"
++ LOGS = "./logs"
++ 
++ DOT = "."
++@@ -20,12 +19,11 @@ class Config:
++ 
++     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
++     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
++-    ValidSize: float = 0.2
+++    ValidSize: float = 0.1
++     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
++-    SavePath: str = SAVEPATH if os.path.isfile(SAVEPATH) else DOT + SAVEPATH
++     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
++     NumClasses: int = 42
++-    Epochs: int = 20
+++    Epochs: int = 10
++ 
++     Batch8:int = 8
++     Batch16: int = 16
++diff --git a/train.py b/train.py
++index 32c2b91..0ad71fd 100644
++--- a/train.py
+++++ b/train.py
++@@ -60,9 +60,16 @@ def train(
+      optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
+      if lr_scheduler is not None:
+          scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
+@@ -46,7 +46,7 @@ index 32c2b91..0ad71fd 100644
+  
+      for epoch in range(epochs):
+          print(f"Epoch: {epoch}")
+-@@ -103,17 +110,17 @@ def train(
++@@ -103,17 +110,17 @@ def train(
+                      {
+                          f"First EP Train ACC": train_eval["accuracy"],
+                          f"First EP Train F1": train_eval["f1"],
+@@ -68,7 +68,7 @@ index 32c2b91..0ad71fd 100644
+                  verbose(phase="Train", eval=train_eval, loss=train_loss)
+  
+                  if epoch == 0:
+-@@ -121,8 +128,8 @@ def train(
++@@ -121,8 +128,8 @@ def train(
+                          {
+                              f"First EP Valid ACC": train_eval["accuracy"],
+                              f"First EP Valid F1": train_eval["f1"],
+@@ -79,7 +79,7 @@ index 32c2b91..0ad71fd 100644
+                              f"First EP Valid Loss": train_loss,
+                          }
+                      )
+-@@ -134,21 +141,31 @@ def train(
++@@ -134,21 +141,31 @@ def train(
+                  "Valid ACC": valid_eval["accuracy"],
+                  "Train F1": train_eval["f1"],
+                  "Valid F1": valid_eval["f1"],
+@@ -118,7 +118,7 @@ index 32c2b91..0ad71fd 100644
+  
+  
+  def validate(model, valid_loader, criterion):
+-@@ -193,9 +210,10 @@ def verbose(phase: str, eval: dict, loss: float):
++@@ -193,9 +210,10 @@ def verbose(phase: str, eval: dict, loss: float):
+  
+  if __name__ == "__main__":
+      LOAD_STATE_DICT = None
+@@ -128,9 +128,9 @@ index 32c2b91..0ad71fd 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+-@@ -217,7 +235,6 @@ if __name__ == "__main__":
++@@ -217,7 +235,6 @@ if __name__ == "__main__":
+  
+      # register logs to wandb
+      args = parser.parse_args()
+@@ -138,12 +138,12 @@ index 32c2b91..0ad71fd 100644
+      name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+      run = wandb.init(project="pstage-klue", name=name, reinit=True)
+      wandb.config.update(args)
+-diff --git a/wandb/latest-run b/wandb/latest-run
+-index 25c39ef..ac16c2a 120000
+---- a/wandb/latest-run
+-+++ b/wandb/latest-run
+-@@ -1 +1 @@
+--run-20210416_190945-14py9lif
+-\ No newline at end of file
+-+run-20210417_042142-1isp7xzk
+-\ No newline at end of file
++diff --git a/wandb/latest-run b/wandb/latest-run
++index 25c39ef..ac16c2a 120000
++--- a/wandb/latest-run
+++++ b/wandb/latest-run
++@@ -1 +1 @@
++-run-20210416_190945-14py9lif
++\ No newline at end of file
+++run-20210417_042142-1isp7xzk
++\ No newline at end of file
+diff --git a/wandb/run-20210417_050727-3t49rv0r/files/code/train.py b/wandb/run-20210417_050727-3t49rv0r/files/code/train.py
+index 5c29d32..be4f7ac 100644
+--- a/wandb/run-20210417_050727-3t49rv0r/files/code/train.py
++++ b/wandb/run-20210417_050727-3t49rv0r/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -253,7 +253,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_050727-3t49rv0r/files/diff.patch b/wandb/run-20210417_050727-3t49rv0r/files/diff.patch
+index dc0772d..62c98e2 100644
+--- a/wandb/run-20210417_050727-3t49rv0r/files/diff.patch
++++ b/wandb/run-20210417_050727-3t49rv0r/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -400,7 +400,7 @@ index 32c2b91..16c1e2d 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,7 +273,6 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_051106-3ayypdx0/files/code/train.py b/wandb/run-20210417_051106-3ayypdx0/files/code/train.py
+index 97edfe7..ce3408b 100644
+--- a/wandb/run-20210417_051106-3ayypdx0/files/code/train.py
++++ b/wandb/run-20210417_051106-3ayypdx0/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -256,7 +256,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_051106-3ayypdx0/files/diff.patch b/wandb/run-20210417_051106-3ayypdx0/files/diff.patch
+index fdfc138..cc9ba28 100644
+--- a/wandb/run-20210417_051106-3ayypdx0/files/diff.patch
++++ b/wandb/run-20210417_051106-3ayypdx0/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -419,7 +419,7 @@ index 32c2b91..4398726 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,7 +276,6 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_052549-1v3nccm1/files/code/train.py b/wandb/run-20210417_052549-1v3nccm1/files/code/train.py
+index 44d03a2..1930240 100644
+--- a/wandb/run-20210417_052549-1v3nccm1/files/code/train.py
++++ b/wandb/run-20210417_052549-1v3nccm1/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_052549-1v3nccm1/files/diff.patch b/wandb/run-20210417_052549-1v3nccm1/files/diff.patch
+index 6569c13..3fcdc8d 100644
+--- a/wandb/run-20210417_052549-1v3nccm1/files/diff.patch
++++ b/wandb/run-20210417_052549-1v3nccm1/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..ba10d31 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,7 +263,6 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_053048-1885fyme/files/code/train.py b/wandb/run-20210417_053048-1885fyme/files/code/train.py
+index 77d593d..7334d73 100644
+--- a/wandb/run-20210417_053048-1885fyme/files/code/train.py
++++ b/wandb/run-20210417_053048-1885fyme/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_053048-1885fyme/files/diff.patch b/wandb/run-20210417_053048-1885fyme/files/diff.patch
+index 7369a7e..ee7d0b1 100644
+--- a/wandb/run-20210417_053048-1885fyme/files/diff.patch
++++ b/wandb/run-20210417_053048-1885fyme/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..f2bcfac 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,7 +263,6 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_053106-2eeazlut/files/code/train.py b/wandb/run-20210417_053106-2eeazlut/files/code/train.py
+index 7b44669..0a58a43 100644
+--- a/wandb/run-20210417_053106-2eeazlut/files/code/train.py
++++ b/wandb/run-20210417_053106-2eeazlut/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_053106-2eeazlut/files/diff.patch b/wandb/run-20210417_053106-2eeazlut/files/diff.patch
+index 00bc4da..7a5a873 100644
+--- a/wandb/run-20210417_053106-2eeazlut/files/diff.patch
++++ b/wandb/run-20210417_053106-2eeazlut/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..f787af0 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,13 +263,13 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_053150-2eez5xve/files/code/train.py b/wandb/run-20210417_053150-2eez5xve/files/code/train.py
+index 77d593d..7334d73 100644
+--- a/wandb/run-20210417_053150-2eez5xve/files/code/train.py
++++ b/wandb/run-20210417_053150-2eez5xve/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_053150-2eez5xve/files/diff.patch b/wandb/run-20210417_053150-2eez5xve/files/diff.patch
+index ce350be..2b4d367 100644
+--- a/wandb/run-20210417_053150-2eez5xve/files/diff.patch
++++ b/wandb/run-20210417_053150-2eez5xve/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..f2bcfac 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,7 +263,6 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_053449-38pyues2/files/code/train.py b/wandb/run-20210417_053449-38pyues2/files/code/train.py
+index 3a79577..2b27894 100644
+--- a/wandb/run-20210417_053449-38pyues2/files/code/train.py
++++ b/wandb/run-20210417_053449-38pyues2/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_053449-38pyues2/files/diff.patch b/wandb/run-20210417_053449-38pyues2/files/diff.patch
+index 5e82724..397d834 100644
+--- a/wandb/run-20210417_053449-38pyues2/files/diff.patch
++++ b/wandb/run-20210417_053449-38pyues2/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..c46b316 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,13 +263,12 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_053722-14peagjs/files/code/train.py b/wandb/run-20210417_053722-14peagjs/files/code/train.py
+index 22741c6..545099c 100644
+--- a/wandb/run-20210417_053722-14peagjs/files/code/train.py
++++ b/wandb/run-20210417_053722-14peagjs/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_053722-14peagjs/files/diff.patch b/wandb/run-20210417_053722-14peagjs/files/diff.patch
+index 5e70d59..72cbe64 100644
+--- a/wandb/run-20210417_053722-14peagjs/files/diff.patch
++++ b/wandb/run-20210417_053722-14peagjs/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -431,7 +431,7 @@ index 32c2b91..a7dfe57 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,13 +263,12 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_054308-3sfnas4u/files/code/train.py b/wandb/run-20210417_054308-3sfnas4u/files/code/train.py
+index ca18123..8a27b71 100644
+--- a/wandb/run-20210417_054308-3sfnas4u/files/code/train.py
++++ b/wandb/run-20210417_054308-3sfnas4u/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_054308-3sfnas4u/files/diff.patch b/wandb/run-20210417_054308-3sfnas4u/files/diff.patch
+index 9313be7..ca9e073 100644
+--- a/wandb/run-20210417_054308-3sfnas4u/files/diff.patch
++++ b/wandb/run-20210417_054308-3sfnas4u/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -432,7 +432,7 @@ index 32c2b91..e1fd4a2 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,13 +263,12 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_054421-qhvltodw/files/code/train.py b/wandb/run-20210417_054421-qhvltodw/files/code/train.py
+index 431606e..bd87340 100644
+--- a/wandb/run-20210417_054421-qhvltodw/files/code/train.py
++++ b/wandb/run-20210417_054421-qhvltodw/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -243,7 +243,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.Base)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+diff --git a/wandb/run-20210417_054421-qhvltodw/files/diff.patch b/wandb/run-20210417_054421-qhvltodw/files/diff.patch
+index 5c88d53..fa5c4bd 100644
+--- a/wandb/run-20210417_054421-qhvltodw/files/diff.patch
++++ b/wandb/run-20210417_054421-qhvltodw/files/diff.patch
+@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
+ +   "metadata": {},
+ +   "outputs": [],
+ +   "source": [
+-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
+++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
+ +   ]
+ +  },
+ +  {
+@@ -432,7 +432,7 @@ index 32c2b91..2fb048f 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ @@ -217,13 +263,12 @@ if __name__ == "__main__":
+  
+diff --git a/wandb/run-20210417_074915-1fuesh80/files/code/train.py b/wandb/run-20210417_074915-1fuesh80/files/code/train.py
+index 2b47314..a6d210d 100644
+--- a/wandb/run-20210417_074915-1fuesh80/files/code/train.py
++++ b/wandb/run-20210417_074915-1fuesh80/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     load_state_dict: str = None,
+     data_root: str = Config.Train,
+@@ -246,7 +246,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--poolder-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_074915-1fuesh80/files/diff.patch b/wandb/run-20210417_074915-1fuesh80/files/diff.patch
+index b5edc90..7612e78 100644
+--- a/wandb/run-20210417_074915-1fuesh80/files/diff.patch
++++ b/wandb/run-20210417_074915-1fuesh80/files/diff.patch
+@@ -24,7 +24,7 @@ index 779849b..b54c1ed 100644
+  
+  def load_model(
+ @@ -8,6 +10,7 @@ def load_model(
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+      load_state_dict: str = None,
+ +    pooler_idx: int = 0 # get last hidden state from CLS
+@@ -46,7 +46,7 @@ index 779849b..b54c1ed 100644
+      return model
+ +
+ +class VanillaBert(nn.Module):
+-+    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.BertMultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+++    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.MultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+ +        super(VanillaBert, self).__init__()
+ +        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
+ +        self.idx = 0 if pooler_idx in ['cls', 0] else pooler_idx 
+@@ -110,7 +110,7 @@ index 0f8c2f8..b33a52a 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_074959-nu17l8tm/files/code/train.py b/wandb/run-20210417_074959-nu17l8tm/files/code/train.py
+index 905012d..082d330 100644
+--- a/wandb/run-20210417_074959-nu17l8tm/files/code/train.py
++++ b/wandb/run-20210417_074959-nu17l8tm/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -247,7 +247,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--poolder-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_074959-nu17l8tm/files/diff.patch b/wandb/run-20210417_074959-nu17l8tm/files/diff.patch
+index 515defe..a4704be 100644
+--- a/wandb/run-20210417_074959-nu17l8tm/files/diff.patch
++++ b/wandb/run-20210417_074959-nu17l8tm/files/diff.patch
+@@ -24,7 +24,7 @@ index 779849b..b54c1ed 100644
+  
+  def load_model(
+ @@ -8,6 +10,7 @@ def load_model(
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+      load_state_dict: str = None,
+ +    pooler_idx: int = 0 # get last hidden state from CLS
+@@ -46,7 +46,7 @@ index 779849b..b54c1ed 100644
+      return model
+ +
+ +class VanillaBert(nn.Module):
+-+    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.BertMultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+++    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.MultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+ +        super(VanillaBert, self).__init__()
+ +        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
+ +        self.idx = 0 if pooler_idx in ['cls', 0] else pooler_idx 
+@@ -95,7 +95,7 @@ index 0f8c2f8..e0d8b59 100644
+ +++ b/train.py
+ @@ -22,6 +22,7 @@ def train(
+      model_type: str = ModelType.SequenceClf,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -127,7 +127,7 @@ index 0f8c2f8..e0d8b59 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_075034-3dzch9ki/files/code/train.py b/wandb/run-20210417_075034-3dzch9ki/files/code/train.py
+index 8c9c407..7889274 100644
+--- a/wandb/run-20210417_075034-3dzch9ki/files/code/train.py
++++ b/wandb/run-20210417_075034-3dzch9ki/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -247,7 +247,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_075034-3dzch9ki/files/diff.patch b/wandb/run-20210417_075034-3dzch9ki/files/diff.patch
+index f9dd226..0d4d480 100644
+--- a/wandb/run-20210417_075034-3dzch9ki/files/diff.patch
++++ b/wandb/run-20210417_075034-3dzch9ki/files/diff.patch
+@@ -24,7 +24,7 @@ index 779849b..b54c1ed 100644
+  
+  def load_model(
+ @@ -8,6 +10,7 @@ def load_model(
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+      load_state_dict: str = None,
+ +    pooler_idx: int = 0 # get last hidden state from CLS
+@@ -46,7 +46,7 @@ index 779849b..b54c1ed 100644
+      return model
+ +
+ +class VanillaBert(nn.Module):
+-+    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.BertMultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+++    def __init__(self, model_type:str=ModelType.SequenceClf, pretrained_type: str=PreTrainedType.MultiLingual, num_labels: int=Config.NumClasses, pooler_idx: int='cls'):
+ +        super(VanillaBert, self).__init__()
+ +        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
+ +        self.idx = 0 if pooler_idx in ['cls', 0] else pooler_idx 
+@@ -95,7 +95,7 @@ index 0f8c2f8..56a0230 100644
+ +++ b/train.py
+ @@ -22,6 +22,7 @@ def train(
+      model_type: str = ModelType.SequenceClf,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -127,7 +127,7 @@ index 0f8c2f8..56a0230 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_075321-1rwxceg1/files/code/train.py b/wandb/run-20210417_075321-1rwxceg1/files/code/train.py
+index 8c9c407..7889274 100644
+--- a/wandb/run-20210417_075321-1rwxceg1/files/code/train.py
++++ b/wandb/run-20210417_075321-1rwxceg1/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.SequenceClf,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -247,7 +247,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_075321-1rwxceg1/files/diff.patch b/wandb/run-20210417_075321-1rwxceg1/files/diff.patch
+index 5d523c6..b5eee13 100644
+--- a/wandb/run-20210417_075321-1rwxceg1/files/diff.patch
++++ b/wandb/run-20210417_075321-1rwxceg1/files/diff.patch
+@@ -16,7 +16,7 @@ index 0f8c2f8..56a0230 100644
+ +++ b/train.py
+ @@ -22,6 +22,7 @@ def train(
+      model_type: str = ModelType.SequenceClf,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -48,7 +48,7 @@ index 0f8c2f8..56a0230 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_080151-3pgvm127/files/code/train.py b/wandb/run-20210417_080151-3pgvm127/files/code/train.py
+index e933165..da60cdf 100644
+--- a/wandb/run-20210417_080151-3pgvm127/files/code/train.py
++++ b/wandb/run-20210417_080151-3pgvm127/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -247,7 +247,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_080151-3pgvm127/files/diff.patch b/wandb/run-20210417_080151-3pgvm127/files/diff.patch
+index f3bcddd..afe6b0b 100644
+--- a/wandb/run-20210417_080151-3pgvm127/files/diff.patch
++++ b/wandb/run-20210417_080151-3pgvm127/files/diff.patch
+@@ -38,7 +38,7 @@ index 0f8c2f8..a3e155d 100644
+  def train(
+ -    model_type: str = ModelType.SequenceClf,
+ +    model_type: str = ModelType.VanillaBert,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -70,7 +70,7 @@ index 0f8c2f8..a3e155d 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_081559-1688hkfz/files/code/train.py b/wandb/run-20210417_081559-1688hkfz/files/code/train.py
+index b646e45..c9eaefa 100644
+--- a/wandb/run-20210417_081559-1688hkfz/files/code/train.py
++++ b/wandb/run-20210417_081559-1688hkfz/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -250,7 +250,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_081559-1688hkfz/files/diff.patch b/wandb/run-20210417_081559-1688hkfz/files/diff.patch
+index c8205d4..61866b7 100644
+--- a/wandb/run-20210417_081559-1688hkfz/files/diff.patch
++++ b/wandb/run-20210417_081559-1688hkfz/files/diff.patch
+@@ -38,7 +38,7 @@ index 0f8c2f8..dd3435c 100644
+  def train(
+ -    model_type: str = ModelType.SequenceClf,
+ +    model_type: str = ModelType.VanillaBert,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -80,7 +80,7 @@ index 0f8c2f8..dd3435c 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_082240-1berijm6/files/code/train.py b/wandb/run-20210417_082240-1berijm6/files/code/train.py
+index b646e45..c9eaefa 100644
+--- a/wandb/run-20210417_082240-1berijm6/files/code/train.py
++++ b/wandb/run-20210417_082240-1berijm6/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -250,7 +250,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_082240-1berijm6/files/diff.patch b/wandb/run-20210417_082240-1berijm6/files/diff.patch
+index 33a2895..fcf45bf 100644
+--- a/wandb/run-20210417_082240-1berijm6/files/diff.patch
++++ b/wandb/run-20210417_082240-1berijm6/files/diff.patch
+@@ -70,7 +70,7 @@ index 62a9073..e39904a 100644
+      def __init__(
+          self,
+ -        model_type: str = ModelType.SequenceClf,
+--        pretrained_type: str = PreTrainedType.BertMultiLingual,
++-        pretrained_type: str = PreTrainedType.MultiLingual,
+ +        model_type: str,
+ +        pretrained_type: str,
+          num_labels: int = Config.NumClasses,
+@@ -89,7 +89,7 @@ index 0f8c2f8..dd3435c 100644
+  def train(
+ -    model_type: str = ModelType.SequenceClf,
+ +    model_type: str = ModelType.VanillaBert,
+-     pretrained_type: str = PreTrainedType.BertMultiLingual,
++     pretrained_type: str = PreTrainedType.MultiLingual,
+      num_classes: int = Config.NumClasses,
+ +    pooler_idx: int = 0, 
+      load_state_dict: str = None,
+@@ -131,7 +131,7 @@ index 0f8c2f8..dd3435c 100644
+ -    parser.add_argument("--model-type", type=str, default=ModelType.Base)
+ +    parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+      parser.add_argument(
+-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+      )
+ -    parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
+ +    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+diff --git a/wandb/run-20210417_091748-2mcgrtfx/files/code/train.py b/wandb/run-20210417_091748-2mcgrtfx/files/code/train.py
+index 090e248..5a63e0b 100644
+--- a/wandb/run-20210417_091748-2mcgrtfx/files/code/train.py
++++ b/wandb/run-20210417_091748-2mcgrtfx/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -240,7 +240,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)
+diff --git a/wandb/run-20210417_091840-7dmyj8nv/files/code/train.py b/wandb/run-20210417_091840-7dmyj8nv/files/code/train.py
+index 090e248..5a63e0b 100644
+--- a/wandb/run-20210417_091840-7dmyj8nv/files/code/train.py
++++ b/wandb/run-20210417_091840-7dmyj8nv/files/code/train.py
+@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
+ 
+ def train(
+     model_type: str = ModelType.VanillaBert,
+-    pretrained_type: str = PreTrainedType.BertMultiLingual,
++    pretrained_type: str = PreTrainedType.MultiLingual,
+     num_classes: int = Config.NumClasses,
+     pooler_idx: int = 0, 
+     load_state_dict: str = None,
+@@ -240,7 +240,7 @@ if __name__ == "__main__":
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
+     parser.add_argument(
+-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
++        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
+     )
+     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+     parser.add_argument("--pooler-idx", type=int, default=0)

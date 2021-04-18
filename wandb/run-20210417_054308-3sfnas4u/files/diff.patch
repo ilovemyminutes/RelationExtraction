@@ -115,7 +115,7 @@ index 16d3a20..aaa6298 100644
 +   "metadata": {},
 +   "outputs": [],
 +   "source": [
-+    "model = BertModel.from_pretrained(PreTrainedType.BertMultiLingual)"
++    "model = BertModel.from_pretrained(PreTrainedType.MultiLingual)"
 +   ]
 +  },
 +  {
@@ -432,7 +432,7 @@ index 32c2b91..e1fd4a2 100644
 -    parser.add_argument("--model-type", type=str, default=ModelType.SequenceClf)
 +    parser.add_argument("--model-type", type=str, default=ModelType.Base)
      parser.add_argument(
-         "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+         "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
      )
 @@ -217,13 +263,12 @@ if __name__ == "__main__":
  

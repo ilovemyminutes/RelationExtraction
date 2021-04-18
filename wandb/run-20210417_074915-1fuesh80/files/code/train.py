@@ -20,7 +20,7 @@ TOTAL_SAMPLES = 9000
 
 def train(
     model_type: str = ModelType.SequenceClf,
-    pretrained_type: str = PreTrainedType.BertMultiLingual,
+    pretrained_type: str = PreTrainedType.MultiLingual,
     num_classes: int = Config.NumClasses,
     load_state_dict: str = None,
     data_root: str = Config.Train,
@@ -246,7 +246,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
     parser.add_argument(
-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
     )
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--poolder-idx", type=int, default=0)
