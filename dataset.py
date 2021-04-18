@@ -7,7 +7,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
-from config import Config, TokenizationType
+from config import Config, PreProcessType
 from utils import load_pickle
 from tokenization import load_tokenizer
 
@@ -88,7 +88,7 @@ class REDataset(Dataset):
     def __init__(
         self,
         root: str = Config.Train,
-        tokenization_type: str = TokenizationType.Base,
+        tokenization_type: str = PreProcessType.Base,
         device: str = Config.Device,
     ):
         self.tokenizer = load_tokenizer(type=tokenization_type)
@@ -132,10 +132,20 @@ class REDataset(Dataset):
         return data_tokenized
 
 
-# for EDA mainly
+# userd for EDA mainly
 def load_data(
     path: str, drop_id: bool = True, encode_label: bool = True
-) -> Tuple[pd.DataFrame, list]:
+) -> pd.DataFrame:
+    """데이터를 불러오는 함수로, EDA를 위해 활용
+
+    Args:
+        path (str): 데이터 경로
+        drop_id (bool, optional): ID 컬럼을 제외할 지 여부를 설정. Defaults to True.
+        encode_label (bool, optional): 레이블을 인코딩할 지 여부를 설정. Defaults to True.
+
+    Returns:
+        pd.DataFrame: 적어도 relation state, entity1/entity2 텍스트와 위치, 레이블이 포함된 데이터프레임
+    """
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -170,6 +180,6 @@ class LabelEncoder:
 
 # just for debug
 if __name__ == "__main__":
-    config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+    config_dataset = dict(root=Config.Train, tokenization_type=PreProcessType.Base)
     dataset = REDataset(**config_dataset)
     train_loader, valid_loader = split_train_test_loader(dataset)
