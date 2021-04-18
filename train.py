@@ -19,15 +19,15 @@ warnings.filterwarnings("ignore")
 TOTAL_SAMPLES = 9000
 
 def train(
-    model_type: str = ModelType.VanillaBert,
-    pretrained_type: str = PreTrainedType.BertMultiLingual,
-    num_classes: int = Config.NumClasses,
-    pooler_idx: int = 0, 
-    load_state_dict: str = None,
-    data_root: str = Config.Train,
-    tokenization_type: str = PreProcessType.Base,
+    model_type: str = ModelType.VanillaBert, # 불러올 모델 프레임
+    pretrained_type: str = PreTrainedType.MultiLingual, # 모델에 활용할 Pretrained BERT Backbone 이름
+    num_classes: int = Config.NumClasses, # 카테고리 수
+    pooler_idx: int = 0, # 인코딩 결과로부터 추출할 hidden state. 0: [CLS]
+    load_state_dict: str = None, # (optional) 저장한 weight 경로
+    data_root: str = Config.Train, # 학습 데이터 경로
+    preprocess_type: str = PreProcessType.Base, # 텍스트 전처리 타입
     epochs: int = Config.Epochs,
-    valid_size: float = Config.ValidSize,
+    valid_size: float = Config.ValidSize, # 학습 데이터 중 검증에 활용할 데이터 비율
     train_batch_size: int = Config.Batch32,
     valid_batch_size: int = 512,
     optim_type: str = Optimizer.Adam,
@@ -43,7 +43,7 @@ def train(
 
     # load data
     dataset = REDataset(
-        root=data_root, tokenization_type=tokenization_type, device=device
+        root=data_root, preprocess_type=preprocess_type, device=device
     )
     if valid_size == 0:
         is_valid = False # validation flag
@@ -86,13 +86,7 @@ def train(
         total_loss = 0
 
         for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc="[Train]"):
-            if model_type == ModelType.SequenceClf:
-                outputs = model(**sentences).logits
-            elif model_type == ModelType.Base:
-                outputs = model(**sentences).pooler_output
-            else:
-                outputs = model(**sentences)
-
+            outputs = model(**sentences)
             loss = criterion(outputs, labels)
             total_loss += loss.item()
 
@@ -100,6 +94,7 @@ def train(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
             if lr_scheduler is not None:
                 scheduler.step()
 
@@ -108,16 +103,18 @@ def train(
             preds = preds.data.cpu().numpy()
             labels = labels.data.cpu().numpy()
 
+            # record predicted outputs
             pred_list.append(preds)
             true_list.append(labels)
 
             pred_arr = np.hstack(pred_list)
             true_arr = np.hstack(true_list)
 
-            # evaluation phase
+            # evaluate each step
             train_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
             train_loss = total_loss / len(true_arr)
 
+            # save logs of train step
             if epoch == 0:
                 wandb.log(
                     {
@@ -127,25 +124,15 @@ def train(
                     }
                 ) 
 
-            if (is_valid) and (idx != 0) and (idx % VALID_CYCLE == 0):
-                valid_eval, valid_loss = validate(
-                    model=model, model_type=model_type, valid_loader=valid_loader, criterion=criterion
-                )
-                verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
-                verbose(phase="Train", eval=train_eval, loss=train_loss)
+        # validation phase
+        valid_eval, valid_loss = validate(
+            model=model, model_type=model_type, valid_loader=valid_loader, criterion=criterion
+        )
+        verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
+        verbose(phase="Train", eval=train_eval, loss=train_loss)
 
-                if epoch == 0:
-                    wandb.log(
-                        {
-                            f"First EP Valid        ACC": train_eval["accuracy"],
-                            f"First EP Valid F1": train_eval["f1"],
-                            f"First EP Valid Loss": train_loss,
-                        }
-                    )
-
-        
-        # logs for one epoch in total
-        if is_valid:
+        # logs for each epoch of train, valid both
+        if is_valid: # when train set splited to train/valid
             wandb.log(
                 {
                     "Train ACC": train_eval["accuracy"],
@@ -156,7 +143,7 @@ def train(
                     "Valid Loss": valid_loss,
                 }
             )
-        else:
+        else: # when train set not splited - all train set are feeded to train
             wandb.log(
                 {
                     "Train ACC": train_eval["accuracy"],
@@ -200,9 +187,9 @@ def validate(model, model_type, valid_loader, criterion):
     pred_list = []
     true_list = []
     total_loss = 0
+    model.eval()
 
-    with torch.no_grad():
-        model.eval()
+    with torch.no_grad():    
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
             if model_type == ModelType.SequenceClf:
                 outputs = model(**sentences).logits
@@ -227,26 +214,27 @@ def validate(model, model_type, valid_loader, criterion):
         # evaluation phase
         valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
         valid_loss = total_loss / len(true_arr)
-        model.train()
+
+    model.train()
 
     return valid_eval, valid_loss
 
 
 
 if __name__ == "__main__":
-    TIMESTAMP = get_timestamp()
+    TIMESTAMP = get_timestamp() # used as an identifier
     LOAD_STATE_DICT = None
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
     parser.add_argument(
-        "--pretrained-type", type=str, default=PreTrainedType.BertMultiLingual
+        "--pretrained-type", type=str, default=PreTrainedType.MultiLingual
     )
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
     parser.add_argument("--data-root", type=str, default=Config.Train)
-    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
+    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
     parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
@@ -259,14 +247,15 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=Config.Seed)
     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
 
-    # register logs to wandb
     args = parser.parse_args()
-    name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+
+    # register logs to wandb
+    name = args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP # file name to save: [MODEL-TYPE]_[PRETRAINED-TYPE]_[EPOCH][ACC][LOSS][ID].pth
     run = wandb.init(project="pstage-klue", name=name, reinit=True)
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int((TOTAL_SAMPLES * (1-args.valid_size)) / args.train_batch_size) - 1 # 학습 과정에서 2번만 검증
+    VALID_CYCLE = int((TOTAL_SAMPLES * (1-args.valid_size)) / args.train_batch_size) - 1 # 학습 마지막
     print("=" * 100)
     print(args)
     print("=" * 100)
