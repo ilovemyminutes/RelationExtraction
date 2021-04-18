@@ -7,6 +7,7 @@ TRAIN = "./input/data/train/train.tsv"
 TEST = "./input/data/test/test.tsv"
 LABEL = "./input/data/label_type.pkl"
 LOGS = "./logs"
+CKPT = "./saved_models"
 
 DOT = "."
 
@@ -19,11 +20,11 @@ class Config:
 
     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
-    ValidSize: float = 0.25
+    ValidSize: float = 0.1
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 10
+    Epochs: int = 3
 
     Batch8:int = 8
     Batch16: int = 16

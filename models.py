@@ -54,7 +54,7 @@ class VanillaBert(nn.Module):
             num_labels=num_labels,
         )
         self.layernorm = nn.LayerNorm(768)  # 768: output length of BERT, or backbone
-        self.dropout = nn.Dropout()
+        self.dropout = nn.Dropout(p=0.8)
         self.relu = nn.ReLU()
         self.linear = nn.Linear(in_features=768, out_features=num_labels)
 

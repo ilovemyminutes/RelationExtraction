@@ -1,0 +1,1142 @@
+diff --git a/config.py b/config.py
+index bb49b06..707fb4d 100644
+--- a/config.py
++++ b/config.py
+@@ -7,6 +7,7 @@ TRAIN = "./input/data/train/train.tsv"
+ TEST = "./input/data/test/test.tsv"
+ LABEL = "./input/data/label_type.pkl"
+ LOGS = "./logs"
++CKPT = "./saved_models"
+ 
+ DOT = "."
+ 
+@@ -19,11 +20,11 @@ class Config:
+ 
+     Train: str = TRAIN if os.path.isfile(TRAIN) else DOT + TRAIN
+     Test: str = TEST if os.path.isfile(TEST) else DOT + TEST
+-    ValidSize: float = 0.25
++    ValidSize: float = 0.1
+     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
+     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
+     NumClasses: int = 42
+-    Epochs: int = 10
++    Epochs: int = 3
+ 
+     Batch8:int = 8
+     Batch16: int = 16
+diff --git a/dataset.py b/dataset.py
+index d08be74..194cdb3 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -158,6 +158,8 @@ class LabelEncoder:
+     def __init__(self, meta_root: str = Config.Label):
+         self.encoder = load_pickle(meta_root)
+         self.decoder = {j: i for j, i in self.encoder.items()}
++        self.encoder['blind'] = 100
++        self.decoder[100] = 'blind'
+ 
+     def transform(self, x):
+         return self.encoder[x]
+diff --git a/inference.py b/inference.py
+index 5561f47..1507c4e 100644
+--- a/inference.py
++++ b/inference.py
+@@ -10,7 +10,7 @@ from config import Config, ModelType, TokenizationType
+ from models import load_model
+ 
+ 
+-def inference(
++def predict(
+     load_state_dict,
+     num_classes,
+     pooler_idx,
+@@ -25,6 +25,7 @@ def inference(
+         model_type, pretrained_type, num_classes, load_state_dict, pooler_idx
+     )
+     model.to(device)
++    model.eval()
+ 
+     # load dataset
+     dataset = REDataset(data_root, tokenization_type, device)
+@@ -33,7 +34,6 @@ def inference(
+     # inference phase
+     pred_list = []
+     with torch.no_grad():
+-        model.eval()
+         for sentences, _ in tqdm(dataloader, desc="[Inference]"):
+             if model_type == ModelType.SequenceClf:
+                 outputs = model(**sentences).logits
+@@ -51,10 +51,11 @@ def inference(
+     submission = pd.DataFrame(dict(pred=pred_arr.tolist()))
+ 
+     if save_path:
+-        if load_state_dict not in os.listdir(save_path):
+-            os.mkdir(os.path.join(save_path, load_state_dict))
+-        save_path = os.path.join(save_path, load_state_dict)
+-        fname = f"submission_{load_state_dict}.csv"
++        model_name = os.path.basename(load_state_dict)
++        if model_name not in os.listdir(save_path):
++            os.mkdir(os.path.join(save_path, model_name))
++        save_path = os.path.join(save_path, model_name)
++        fname = f"submission_{model_name}.csv"
+         submission.to_csv(os.path.join(save_path, fname), index=False)
+     else:
+         return submission
+@@ -68,7 +69,8 @@ def get_model_pretrained_type(load_state_dict: str):
+ 
+ 
+ if __name__ == "__main__":
+-    LOAD_STATE_DICT = None
++    MODELNAME = "VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth"
++    LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)
+ 
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+@@ -77,4 +79,7 @@ if __name__ == "__main__":
+     parser.add_argument("--data-root", type=str, default=Config.Train)
+     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+     parser.add_argument("--device", type=str, default=Config.Device)
+-    parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
++    parser.add_argument("--save-path", type=str, default=Config.SavePath)
++    args = parser.parse_args()
++
++    predict(**vars(args))
+\ No newline at end of file
+diff --git a/models.py b/models.py
+index e39904a..e52a096 100644
+--- a/models.py
++++ b/models.py
+@@ -54,7 +54,7 @@ class VanillaBert(nn.Module):
+             num_labels=num_labels,
+         )
+         self.layernorm = nn.LayerNorm(768)  # 768: output length of BERT, or backbone
+-        self.dropout = nn.Dropout()
++        self.dropout = nn.Dropout(p=0.8)
+         self.relu = nn.ReLU()
+         self.linear = nn.Linear(in_features=768, out_features=num_labels)
+ 
+diff --git a/notebooks/Debug - Model Inference.ipynb b/notebooks/Debug - Model Inference.ipynb
+index 9f37b06..d612b61 100644
+--- a/notebooks/Debug - Model Inference.ipynb	
++++ b/notebooks/Debug - Model Inference.ipynb	
+@@ -23,7 +23,7 @@
+  "cells": [
+   {
+    "cell_type": "code",
+-   "execution_count": 1,
++   "execution_count": 11,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+@@ -31,37 +31,932 @@
+     "from torch.nn import functional as F\n",
+     "from torch import optim\n",
+     "from torch import nn\n",
++    "from torch.utils.data import DataLoader\n",
+     "import sys\n",
+     "sys.path.insert(0, '../')\n",
+     "\n",
+     "from config import Config, ModelType, PreTrainedType\n",
+     "from transformers import BertModel, BertConfig, BertForSequenceClassification\n",
+     "from models import load_model\n",
+-    "from dataset import REDataset, split_train_test_loader\n",
+-    "from utils import set_seed"
++    "from dataset import REDataset, split_train_test_loader, LabelEncoder\n",
++    "from utils import set_seed\n",
++    "from inference import get_model_pretrained_type"
+    ]
+   },
+   {
+    "cell_type": "code",
+    "execution_count": 2,
+    "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "'../saved_models/VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth'"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 2
++    }
++   ],
++   "source": [
++    "MODELNAME = \"VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth\"\n",
++    "LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)\n",
++    "LOAD_STATE_DICT"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 44,
++   "metadata": {},
+    "outputs": [
+     {
+      "output_type": "stream",
+      "name": "stdout",
+      "text": [
+-      "Load Model...\tasdfasdfs\n",
+-      "Some weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
++      "Load Tokenizer...\tdone!\n",
++      "Load raw data...\tdone!\n",
++      "Apply Tokenization...\tdone!\n"
++     ]
++    }
++   ],
++   "source": [
++    "dataset = REDataset(Config.Train, device='cpu')"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 49,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "dataloader = DataLoader(dataset, batch_size=1)\n",
++    "samples = []\n",
++    "for idx, (sents, labels) in enumerate(dataloader):\n",
++    "    samples.append((sents, labels))\n",
++    "    if idx > 3:\n",
++    "        break"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 46,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "('VanillaBert', 'bert-base-multilingual-cased')"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 46
++    }
++   ],
++   "source": [
++    "model_type, pretrained_type = get_model_pretrained_type(LOAD_STATE_DICT)\n",
++    "model_type, pretrained_type\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 47,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "stream",
++     "name": "stdout",
++     "text": [
++      "Load Model...\tSome weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
+       "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+       "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
+       "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
+       "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n",
+       "done!\n"
+      ]
++    },
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "VanillaBert(\n",
++       "  (backbone): BertModel(\n",
++       "    (embeddings): BertEmbeddings(\n",
++       "      (word_embeddings): Embedding(119547, 768, padding_idx=0)\n",
++       "      (position_embeddings): Embedding(512, 768)\n",
++       "      (token_type_embeddings): Embedding(2, 768)\n",
++       "      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "      (dropout): Dropout(p=0.1, inplace=False)\n",
++       "    )\n",
++       "    (encoder): BertEncoder(\n",
++       "      (layer): ModuleList(\n",
++       "        (0): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (1): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (2): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (3): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (4): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (5): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (6): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (7): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (8): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (9): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (10): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (11): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "      )\n",
++       "    )\n",
++       "    (pooler): BertPooler(\n",
++       "      (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "      (activation): Tanh()\n",
++       "    )\n",
++       "  )\n",
++       "  (layernorm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)\n",
++       "  (dropout): Dropout(p=0.5, inplace=False)\n",
++       "  (relu): ReLU()\n",
++       "  (linear): Linear(in_features=768, out_features=42, bias=True)\n",
++       ")"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 47
++    }
++   ],
++   "source": [
++    "model_notrain = load_model(\n",
++    "        model_type, pretrained_type, 42, None, 0\n",
++    "    )\n",
++    "model_notrain.eval()"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 48,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "stream",
++     "name": "stdout",
++     "text": [
++      "Load Model...\tSome weights of the model checkpoint at bert-base-multilingual-cased were not used when initializing BertForSequenceClassification: ['cls.predictions.bias', 'cls.predictions.transform.dense.weight', 'cls.predictions.transform.dense.bias', 'cls.predictions.decoder.weight', 'cls.seq_relationship.weight', 'cls.seq_relationship.bias', 'cls.predictions.transform.LayerNorm.weight', 'cls.predictions.transform.LayerNorm.bias']\n",
++      "- This IS expected if you are initializing BertForSequenceClassification from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
++      "- This IS NOT expected if you are initializing BertForSequenceClassification from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n",
++      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-multilingual-cased and are newly initialized: ['classifier.weight', 'classifier.bias']\n",
++      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n",
++      "Loaded pretrained weights from ../saved_models/VanillaBert_bert-base-multilingual-cased_20210417172240/VanillaBert_bert-base-multilingual-cased_ep(04)acc(0.5004)loss(0.0047)id(20210417172240).pth\tdone!\n"
++     ]
++    },
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "VanillaBert(\n",
++       "  (backbone): BertModel(\n",
++       "    (embeddings): BertEmbeddings(\n",
++       "      (word_embeddings): Embedding(119547, 768, padding_idx=0)\n",
++       "      (position_embeddings): Embedding(512, 768)\n",
++       "      (token_type_embeddings): Embedding(2, 768)\n",
++       "      (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "      (dropout): Dropout(p=0.1, inplace=False)\n",
++       "    )\n",
++       "    (encoder): BertEncoder(\n",
++       "      (layer): ModuleList(\n",
++       "        (0): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (1): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (2): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (3): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (4): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (5): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (6): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (7): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (8): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (9): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (10): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "        (11): BertLayer(\n",
++       "          (attention): BertAttention(\n",
++       "            (self): BertSelfAttention(\n",
++       "              (query): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (key): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (value): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "            (output): BertSelfOutput(\n",
++       "              (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "              (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "              (dropout): Dropout(p=0.1, inplace=False)\n",
++       "            )\n",
++       "          )\n",
++       "          (intermediate): BertIntermediate(\n",
++       "            (dense): Linear(in_features=768, out_features=3072, bias=True)\n",
++       "          )\n",
++       "          (output): BertOutput(\n",
++       "            (dense): Linear(in_features=3072, out_features=768, bias=True)\n",
++       "            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)\n",
++       "            (dropout): Dropout(p=0.1, inplace=False)\n",
++       "          )\n",
++       "        )\n",
++       "      )\n",
++       "    )\n",
++       "    (pooler): BertPooler(\n",
++       "      (dense): Linear(in_features=768, out_features=768, bias=True)\n",
++       "      (activation): Tanh()\n",
++       "    )\n",
++       "  )\n",
++       "  (layernorm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)\n",
++       "  (dropout): Dropout(p=0.5, inplace=False)\n",
++       "  (relu): ReLU()\n",
++       "  (linear): Linear(in_features=768, out_features=42, bias=True)\n",
++       ")"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 48
++    }
++   ],
++   "source": [
++    "model_train = load_model(\n",
++    "        model_type, pretrained_type, 42, LOAD_STATE_DICT, 0\n",
++    "    )\n",
++    "model_train.eval()"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 53,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "outputs_train = model_train(**samples[0][0])\n",
++    "outputs_notrain = model_notrain(**samples[0][0])"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 54,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([[ 2.1118, -1.8216, -0.0141, -2.6182,  0.4168, -1.0313, -1.0126, -1.1142,\n",
++       "         -1.4230, -2.1413,  0.5483, -2.2418, -3.0003, -4.3309, -2.6733, -0.6005,\n",
++       "         -2.5336, -0.9895, -5.8246, -6.6203, -1.3131, -1.8837, -2.7640, -2.0999,\n",
++       "         -2.1457, -2.2759, -4.5296, -2.4411, -4.1593, -5.0778, -4.3852, -3.6810,\n",
++       "         -2.8476, -2.0332, -3.6978, -3.2684, -4.1173, -5.7310, -3.9672, -4.4849,\n",
++       "         -7.0915, -5.0775]], grad_fn=<AddmmBackward>)"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 54
++    }
++   ],
++   "source": [
++    "IDX = 1\n",
++    "SENT = 0\n",
++    "LABEL = 1\n",
++    "outputs_train = model_train(**samples[IDX][SENT])\n",
++    "outputs_train"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 28,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "{'input_ids': tensor([[  101, 50266, 11489,  ...,     0,     0,     0],\n",
++       "         [  101,  9428, 41521,  ...,     0,     0,     0],\n",
++       "         [  101, 68495, 37905,  ...,     0,     0,     0],\n",
++       "         ...,\n",
++       "         [  101,  9746, 21611,  ...,     0,     0,     0],\n",
++       "         [  101, 53519, 24756,  ...,     0,     0,     0],\n",
++       "         [  101,  9735, 29935,  ..., 10622,  9460,   102]]),\n",
++       " 'token_type_ids': tensor([[0, 0, 0,  ..., 0, 0, 0],\n",
++       "         [0, 0, 0,  ..., 0, 0, 0],\n",
++       "         [0, 0, 0,  ..., 0, 0, 0],\n",
++       "         ...,\n",
++       "         [0, 0, 0,  ..., 0, 0, 0],\n",
++       "         [0, 0, 0,  ..., 0, 0, 0],\n",
++       "         [0, 0, 0,  ..., 0, 0, 0]]),\n",
++       " 'attention_mask': tensor([[1, 1, 1,  ..., 0, 0, 0],\n",
++       "         [1, 1, 1,  ..., 0, 0, 0],\n",
++       "         [1, 1, 1,  ..., 0, 0, 0],\n",
++       "         ...,\n",
++       "         [1, 1, 1,  ..., 0, 0, 0],\n",
++       "         [1, 1, 1,  ..., 0, 0, 0],\n",
++       "         [1, 1, 1,  ..., 1, 1, 1]])}"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 28
++    }
++   ],
++   "source": [
++    "sents"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 29,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([17,  0,  6,  2,  8,  0, 17,  3, 10,  0,  4,  0, 16,  4,  0,  0,  0,  0,\n",
++       "         4,  0,  0,  7, 17,  2,  6,  0, 10,  0, 10, 17,  8,  0, 15, 15,  5, 25,\n",
++       "         0,  0,  5,  0,  0,  8,  0,  6,  0, 15,  0,  0,  0,  4, 10,  4,  0, 10,\n",
++       "         0, 10, 15,  0,  0,  0,  4,  0, 10,  0])"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 29
++    }
++   ],
++   "source": [
++    "labels"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 43,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([ 2.1118, -1.8216, -0.0141, -2.6182,  0.4168, -1.0313, -1.0126, -1.1142,\n",
++       "        -1.4230, -2.1413,  0.5483, -2.2418, -3.0003, -4.3309, -2.6733, -0.6005,\n",
++       "        -2.5336, -0.9895, -5.8246, -6.6203, -1.3131, -1.8837, -2.7640, -2.0999,\n",
++       "        -2.1457, -2.2759, -4.5296, -2.4411, -4.1593, -5.0778, -4.3852, -3.6810,\n",
++       "        -2.8476, -2.0332, -3.6978, -3.2684, -4.1173, -5.7310, -3.9672, -4.4849,\n",
++       "        -7.0915, -5.0775], grad_fn=<SelectBackward>)"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 43
++    }
++   ],
++   "source": [
++    "outputs_train[8]"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 32,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n",
++       "        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 32
++    }
++   ],
++   "source": [
++    "# 학습한 경우\n",
++    "F.softmax(outputs_train, dim=1).argmax(dim=1)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 33,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([27, 41, 11, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 11, 27,\n",
++       "        27, 16, 27, 27, 27, 27, 27, 27, 27, 31, 27, 27, 27, 11, 11, 31, 11, 27,\n",
++       "        11, 27, 27, 27, 11, 27, 27, 11, 27, 27, 27, 27, 27, 27, 27, 27, 16, 15,\n",
++       "        27, 27, 27, 11, 11, 11, 27, 27, 27, 39])"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 33
+     }
+    ],
+    "source": [
+-    "model = load_model(model_type=ModelType.VanillaBert)"
++    "# 학습하지 않은 경우\n",
++    "F.softmax(outputs_notrain, dim=1).argmax(dim=1)"
+    ]
+   },
+   {
+diff --git a/train.py b/train.py
+index dd3435c..f5881cd 100644
+--- a/train.py
++++ b/train.py
+@@ -123,8 +123,6 @@ def train(
+                     {
+                         f"First EP Train ACC": train_eval["accuracy"],
+                         f"First EP Train F1": train_eval["f1"],
+-                        # f"First EP Train PRC": train_eval["precision"],
+-                        # f"First EP Train REC": train_eval["recall"],
+                         f"First EP Train Loss": train_loss,
+                     }
+                 ) 
+@@ -141,8 +139,6 @@ def train(
+                         {
+                             f"First EP Valid        ACC": train_eval["accuracy"],
+                             f"First EP Valid F1": train_eval["f1"],
+-                            # f"First EP Valid PRC": train_eval["precision"],
+-                            # f"First EP Valid REC": train_eval["recall"],
+                             f"First EP Valid Loss": train_loss,
+                         }
+                     )
+@@ -156,10 +152,6 @@ def train(
+                     "Valid ACC": valid_eval["accuracy"],
+                     "Train F1": train_eval["f1"],
+                     "Valid F1": valid_eval["f1"],
+-                    # "Train PRC": train_eval["precision"],
+-                    # "Valid PRC": valid_eval["precision"],
+-                    # "Train REC": train_eval["recall"],
+-                    # "Valid REC": valid_eval["recall"],
+                     "Train Loss": train_loss,
+                     "Valid Loss": valid_loss,
+                 }
+@@ -169,8 +161,6 @@ def train(
+                 {
+                     "Train ACC": train_eval["accuracy"],
+                     "Train F1": train_eval["f1"],
+-                    # "Train PRC": train_eval["precision"],
+-                    # "Train REC": train_eval["recall"],
+                     "Train Loss": train_loss,
+                 }
+             )
+@@ -220,7 +210,7 @@ def validate(model, model_type, valid_loader, criterion):
+                 outputs = model(**sentences).pooler_output
+             else:
+                 outputs = model(**sentences)
+-                
++
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+ 
+@@ -259,11 +249,11 @@ if __name__ == "__main__":
+     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+     parser.add_argument("--epochs", type=int, default=Config.Epochs)
+     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
+-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch16)
++    parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
+     parser.add_argument("--valid-batch-size", type=int, default=512)
+     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
+     parser.add_argument("--loss-type", type=str, default=Loss.CE)
+-    parser.add_argument("--lr", type=float, default=Config.LRSlow)
++    parser.add_argument("--lr", type=float, default=Config.LRSlower)
+     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineScheduler)
+     parser.add_argument("--device", type=str, default=Config.Device)
+     parser.add_argument("--seed", type=int, default=Config.Seed)
+diff --git a/wandb/latest-run b/wandb/latest-run
+index 62dab4a..ca43bec 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210417_082240-1berijm6
+\ No newline at end of file
++run-20210417_091840-7dmyj8nv
+\ No newline at end of file
