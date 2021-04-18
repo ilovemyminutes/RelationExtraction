@@ -63,14 +63,14 @@ class REDataset(Dataset):
         print("done!")
         return data_tokenized
 
-    def _load_data(self, root: str, preprocess_type: str) -> pd.DataFrame:
+    @staticmethod
+    def _load_data(root: str, preprocess_type: str) -> pd.DataFrame:
         enc = LabelEncoder()
         print("Load raw data...", end="\t")
         raw = pd.read_csv(root, sep="\t", header=None)
         raw.columns = COLUMNS
         raw = raw.drop("id", axis=1)
         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
-        # raw = raw[raw['label'] != 0].reset_index(drop=True)
         print(f"preprocessing for '{preprocess_type}'...", end="\t")
         data = preprocess_text(raw, method=preprocess_type)
         print("done!")
