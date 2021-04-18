@@ -32,7 +32,7 @@ index 5a34b96..202158d 100644
 @@ -11,6 +12,7 @@ from optimizers import get_optimizer, get_scheduler
  from criterions import get_criterion
  from utils import get_timestamp, set_seed
- from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
+ from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
 +warnings.filterwarnings("ignore")
  
  

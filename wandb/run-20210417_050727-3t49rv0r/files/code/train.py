@@ -12,7 +12,7 @@ from dataset import REDataset, split_train_test_loader
 from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from utils import get_timestamp, set_seed
-from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
+from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
 
 warnings.filterwarnings("ignore")
 
@@ -24,7 +24,7 @@ def train(
     num_classes: int = Config.NumClasses,
     load_state_dict: str = None,
     data_root: str = Config.Train,
-    tokenization_type: str = TokenizationType.Base,
+    tokenization_type: str = PreProcessType.Base,
     epochs: int = Config.Epochs,
     valid_size: float = Config.ValidSize,
     train_batch_size: int = Config.Batch32,
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-classes", type=str, default=Config.NumClasses)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
     parser.add_argument("--data-root", type=str, default=Config.Train)
-    parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
     parser.add_argument("--train-batch-size", type=int, default=Config.Batch16)

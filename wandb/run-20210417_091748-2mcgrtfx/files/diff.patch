@@ -50,7 +50,7 @@ diff --git a/inference.py b/inference.py
 index 5561f47..1507c4e 100644
 --- a/inference.py
 +++ b/inference.py
-@@ -10,7 +10,7 @@ from config import Config, ModelType, TokenizationType
+@@ -10,7 +10,7 @@ from config import Config, ModelType, PreProcessType
  from models import load_model
  
  
@@ -103,7 +103,7 @@ index 5561f47..1507c4e 100644
      parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
 @@ -77,4 +79,7 @@ if __name__ == "__main__":
      parser.add_argument("--data-root", type=str, default=Config.Train)
-     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+     parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
      parser.add_argument("--device", type=str, default=Config.Device)
 -    parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
 +    parser.add_argument("--save-path", type=str, default=Config.SavePath)
@@ -1127,7 +1127,7 @@ index dd3435c..f5881cd 100644
              total_loss += loss.item()
  
 @@ -259,11 +249,11 @@ if __name__ == "__main__":
-     parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+     parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
      parser.add_argument("--epochs", type=int, default=Config.Epochs)
      parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
 -    parser.add_argument("--train-batch-size", type=int, default=Config.Batch16)

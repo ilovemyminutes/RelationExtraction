@@ -1,15 +1,18 @@
 import random
-from typing import Tuple
+from typing import Tuple, Dict
 import pandas as pd
 import torch
+from torch.functional import Tensor
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
-from config import Config, TokenizationType
+from config import Config, PreProcessType
 from utils import load_pickle
 from tokenization import load_tokenizer
+from preprocessing import preprocess_text
+
 
 COLUMNS = [
     "id",
@@ -23,9 +26,58 @@ COLUMNS = [
     "label",
 ]
 
+class REDataset(Dataset):
+    def __init__(
+        self,
+        root: str = Config.Train,
+        preprocess_type: str = PreProcessType.Base,
+        device: str = Config.Device,
+    ):
+        self.data = self._load_data(root, preprocess_type=preprocess_type)
+        self.tokenizer = load_tokenizer(type=preprocess_type)
+        self.inputs = self._tokenize(self.data)
+        self.labels = self.data["label"].tolist()
+        self.device = device
+
+    def __getitem__(self, idx) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""        
+        sentence = {
+            key: torch.as_tensor(val[idx]).to(self.device) # device 할당
+            for key, val in self.inputs.items()
+        }
+        label = torch.as_tensor(self.labels[idx]).to(self.device) # device 할당
+        return sentence, label
+
+    def __len__(self):
+        return len(self.labels)
+
+    def _tokenize(self, data):
+        print("Apply Tokenization...", end="\t")
+        data_tokenized = self.tokenizer(
+            data["input"].tolist(),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=128,
+            add_special_tokens=True,
+        )
+        print("done!")
+        return data_tokenized
+
+    def _load_data(self, root: str, preprocess_type: str) -> pd.DataFrame:
+        enc = LabelEncoder()
+        print("Load raw data...", end="\t")
+        raw = pd.read_csv(root, sep="\t", header=None)
+        raw.columns = COLUMNS
+        raw = raw.drop("id", axis=1)
+        raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+        print(f"preprocessing for '{preprocess_type}'...", end="\t")
+        data = preprocess_text(raw, method=preprocess_type)
+        print("done!")
+        return data
+
 
 # TODO: K-Fold
-
 
 def split_train_test_loader(
     dataset: Dataset,
@@ -84,58 +136,20 @@ def split_train_test_loader(
     return train_loader, test_loader
 
 
-class REDataset(Dataset):
-    def __init__(
-        self,
-        root: str = Config.Train,
-        tokenization_type: str = TokenizationType.Base,
-        device: str = Config.Device,
-    ):
-        self.tokenizer = load_tokenizer(type=tokenization_type)
-        self.enc = LabelEncoder()
-        raw = self._load_raw(root)
-        self.sentences = self._tokenize(raw)
-        self.labels = raw["label"].tolist()
-        self.device = device
-
-    def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
-        sentence = {
-            key: torch.as_tensor(val[idx]).to(self.device)
-            for key, val in self.sentences.items()
-        }
-        label = torch.as_tensor(self.labels[idx]).to(self.device)
-        return sentence, label
-
-    def __len__(self):
-        return len(self.labels)
-
-    def _load_raw(self, root):
-        print("Load raw data...", end="\t")
-        raw = pd.read_csv(root, sep="\t", header=None)
-        raw.columns = COLUMNS
-        raw = raw.drop("id", axis=1)
-        raw["label"] = raw["label"].apply(lambda x: self.enc.transform(x))
-        print("done!")
-        return raw
-
-    def _tokenize(self, data):
-        print("Apply Tokenization...", end="\t")
-        data_tokenized = self.tokenizer(
-            data["relation_state"].tolist(),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=128,
-            add_special_tokens=True,
-        )
-        print("done!")
-        return data_tokenized
-
-
-# for EDA mainly
+# userd for EDA mainly
 def load_data(
     path: str, drop_id: bool = True, encode_label: bool = True
-) -> Tuple[pd.DataFrame, list]:
+) -> pd.DataFrame:
+    """데이터를 불러오는 함수로, EDA를 위해 활용
+
+    Args:
+        path (str): 데이터 경로
+        drop_id (bool, optional): ID 컬럼을 제외할 지 여부를 설정. Defaults to True.
+        encode_label (bool, optional): 레이블을 인코딩할 지 여부를 설정. Defaults to True.
+
+    Returns:
+        pd.DataFrame: 적어도 relation state, entity1/entity2 텍스트와 위치, 레이블이 포함된 데이터프레임
+    """
     data = pd.read_csv(path, sep="\t", header=None, names=COLUMNS)
 
     # test data have no labels
@@ -158,8 +172,8 @@ class LabelEncoder:
     def __init__(self, meta_root: str = Config.Label):
         self.encoder = load_pickle(meta_root)
         self.decoder = {j: i for j, i in self.encoder.items()}
-        self.encoder['blind'] = 100
-        self.decoder[100] = 'blind'
+        self.encoder["blind"] = 42
+        self.decoder[42] = "blind"
 
     def transform(self, x):
         return self.encoder[x]
@@ -170,6 +184,6 @@ class LabelEncoder:
 
 # just for debug
 if __name__ == "__main__":
-    config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+    config_dataset = dict(root=Config.Train, tokenization_type=PreProcessType.Base)
     dataset = REDataset(**config_dataset)
     train_loader, valid_loader = split_train_test_loader(dataset)

@@ -40,7 +40,7 @@ index d0d921c..d08be74 100644
      train_batch_size: int = 32,
 @@ -170,4 +170,4 @@ class LabelEncoder:
  if __name__ == "__main__":
-     config_dataset = dict(root=Config.Train, tokenization_type=TokenizationType.Base)
+     config_dataset = dict(root=Config.Train, tokenization_type=PreProcessType.Base)
      dataset = REDataset(**config_dataset)
 -    train_loader, valid_loader = get_train_test_loader(dataset)
 +    train_loader, valid_loader = split_train_test_loader(dataset)
@@ -56,7 +56,7 @@ index 1f5ece6..54d385e 100644
 +    "from dataset import REDataset, split_train_test_loader, load_data\n",
      "from models import load_model\n",
      "from tokenization import load_tokenizer\n",
-     "from config import Config, ModelType, PreTrainedType, TokenizationType\n",
+     "from config import Config, ModelType, PreTrainedType, PreProcessType\n",
 @@ -89,7 +89,7 @@
    {
     "source": [
@@ -83,7 +83,7 @@ index 16d3a20..aaa6298 100644
      "\n",
      "sys.path.insert(0, '../')\n",
      "from models import load_model\n",
--    "from config import Config, TrainArgs, ModelType, PreTrainedType, TokenizationType, TrainArgs\n",
+-    "from config import Config, TrainArgs, ModelType, PreTrainedType, PreProcessType, TrainArgs\n",
 -    "from dataset import load_data, apply_tokenization, REDataset\n",
 -    "from load_tokenizer import load_tokenizer"
 +    "from dataset import REDataset\n",
@@ -218,7 +218,7 @@ index 32c2b91..c46b316 100644
  from criterions import get_criterion
 -from utils import get_timestamp, set_seed
 +from utils import get_timestamp, set_seed, verbose, ckpt_name
- from config import ModelType, Config, Optimizer, PreTrainedType, TokenizationType, Loss
+ from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
  
  warnings.filterwarnings("ignore")
 @@ -43,12 +44,17 @@ def train(

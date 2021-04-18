@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from dataset import REDataset
-from config import Config, ModelType, TokenizationType
+from config import Config, ModelType, PreProcessType
 from models import load_model
 
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--data-root", type=str, default=Config.Test)
-    parser.add_argument("--tokenization-type", type=str, default=TokenizationType.Base)
+    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--save-path", type=str, default=Config.SavePath)
     args = parser.parse_args()
