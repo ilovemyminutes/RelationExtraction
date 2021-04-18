@@ -13,8 +13,8 @@ from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from utils import get_timestamp, set_seed, verbose, ckpt_name
 from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
-
 warnings.filterwarnings("ignore")
+
 
 TOTAL_SAMPLES = 9000
 
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--valid-batch-size", type=int, default=512)
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LRSlower)
+    parser.add_argument("--lr", type=float, default=Config.LR)
     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineScheduler)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
@@ -262,7 +262,6 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int((TOTAL_SAMPLES * (1-args.valid_size)) / args.train_batch_size) - 1 # 학습 마지막
     print("=" * 100)
     print(args)
     print("=" * 100)
