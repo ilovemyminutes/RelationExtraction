@@ -1,0 +1,44 @@
+diff --git a/config.py b/config.py
+index e98adcc..9a2843c 100644
+--- a/config.py
++++ b/config.py
+@@ -24,7 +24,7 @@ class Config:
+     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
+     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
+     NumClasses: int = 42
+-    Epochs: int = 3
++    Epochs: int = 10
+ 
+     Batch8:int = 8
+     Batch16: int = 16
+@@ -35,7 +35,7 @@ class Config:
+     LRFast: float = 0.005
+     LR: float = 0.001
+     LRSlow: float = 0.0005
+-    LRSlower: float = 0.0001
++    LRSlower: float = 0.000005
+ 
+     Seed: int = 42
+     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+diff --git a/dataset.py b/dataset.py
+index 526792b..251ecbd 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -70,7 +70,7 @@ class REDataset(Dataset):
+         raw.columns = COLUMNS
+         raw = raw.drop("id", axis=1)
+         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+-        # raw = raw[raw['label'] != 0].reset_index(drop=True)
++        raw = raw[raw['label'] != 0].reset_index(drop=True)
+         print(f"preprocessing for '{preprocess_type}'...", end="\t")
+         data = preprocess_text(raw, method=preprocess_type)
+         print("done!")
+diff --git a/wandb/latest-run b/wandb/latest-run
+index 178711f..28f6313 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_102228-1jagit0t
+\ No newline at end of file
++run-20210418_102949-1zdi2hav
+\ No newline at end of file

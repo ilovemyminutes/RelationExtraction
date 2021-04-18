@@ -24,7 +24,7 @@ class Config:
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 3
+    Epochs: int = 10
 
     Batch8:int = 8
     Batch16: int = 16
@@ -35,7 +35,7 @@ class Config:
     LRFast: float = 0.005
     LR: float = 0.001
     LRSlow: float = 0.0005
-    LRSlower: float = 0.0001
+    LRSlower: float = 0.000005
 
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

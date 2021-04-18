@@ -1,0 +1,22 @@
+diff --git a/dataset.py b/dataset.py
+index 526792b..251ecbd 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -70,7 +70,7 @@ class REDataset(Dataset):
+         raw.columns = COLUMNS
+         raw = raw.drop("id", axis=1)
+         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+-        # raw = raw[raw['label'] != 0].reset_index(drop=True)
++        raw = raw[raw['label'] != 0].reset_index(drop=True)
+         print(f"preprocessing for '{preprocess_type}'...", end="\t")
+         data = preprocess_text(raw, method=preprocess_type)
+         print("done!")
+diff --git a/wandb/latest-run b/wandb/latest-run
+index 178711f..5ab5c49 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_102228-1jagit0t
+\ No newline at end of file
++run-20210418_102635-31b6w9sv
+\ No newline at end of file
