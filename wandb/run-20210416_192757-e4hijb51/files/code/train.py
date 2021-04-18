@@ -17,6 +17,7 @@ warnings.filterwarnings("ignore")
 
 TOTAL_SAMPLES = 9000
 
+
 def train(
     model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.MultiLingual,
@@ -147,8 +148,7 @@ def train(
             name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({TIMESTAMP}).pth"
             best_acc = valid_eval["accuracy"]
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
-            
+            print(f"Model saved: {os.path.join(save_path, name)}")
 
 
 def validate(model, valid_loader, criterion):
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int(TOTAL_SAMPLES * args.valid_size) // 2 # 학습 과정에서 2번만 검증
+    VALID_CYCLE = int(TOTAL_SAMPLES * args.valid_size) // 2  # 학습 과정에서 2번만 검증
     print("=" * 100)
     print(args)
     print("=" * 100)

@@ -25,7 +25,12 @@ def load_model(
             pretrained_type, config=bert_config
         )
     elif model_type == ModelType.VanillaBert:
-        model = VanillaBert(model_type=ModelType.SequenceClf, pretrained_type=pretrained_type, num_labels=num_classes, pooler_idx=pooler_idx)
+        model = VanillaBert(
+            model_type=ModelType.SequenceClf,
+            pretrained_type=pretrained_type,
+            num_labels=num_classes,
+            pooler_idx=pooler_idx,
+        )
     else:
         raise NotImplementedError()
 
@@ -40,9 +45,9 @@ def load_model(
 class VanillaBert(nn.Module):
     def __init__(
         self,
-        model_type: str=ModelType.SequenceClf, # BertForSequenceClassification
-        pretrained_type: str=PreTrainedType.MultiLingual, # bert-base-multilingual-cased
-        num_labels: int = Config.NumClasses, # 42
+        model_type: str = ModelType.SequenceClf,  # BertForSequenceClassification
+        pretrained_type: str = PreTrainedType.MultiLingual,  # bert-base-multilingual-cased
+        num_labels: int = Config.NumClasses,  # 42
         pooler_idx: int = 0,
     ):
         super(VanillaBert, self).__init__()
@@ -64,7 +69,7 @@ class VanillaBert(nn.Module):
             attention_mask=attention_mask,
         )
         # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
-        x = x.last_hidden_state[:, self.idx, :] 
+        x = x.last_hidden_state[:, self.idx, :]
         x = self.layernorm(x)
         x = self.dropout(x)
         x = self.relu(x)
@@ -74,10 +79,8 @@ class VanillaBert(nn.Module):
     @staticmethod
     def load_bert(model_type, pretrained_type):
         if model_type == ModelType.SequenceClf:
-            model = BertForSequenceClassification.from_pretrained(
-                pretrained_type
-            )
-            model = model.bert # 마지막 레이어을 제외한 BERT 아키텍쳐만을 backbone으로 사용
+            model = BertForSequenceClassification.from_pretrained(pretrained_type)
+            model = model.bert  # 마지막 레이어을 제외한 BERT 아키텍쳐만을 backbone으로 사용
         else:
             raise NotImplementedError()
 

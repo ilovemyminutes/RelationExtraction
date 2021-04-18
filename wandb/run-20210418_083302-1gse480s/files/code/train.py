@@ -18,16 +18,17 @@ warnings.filterwarnings("ignore")
 
 TOTAL_SAMPLES = 9000
 
+
 def train(
-    model_type: str = ModelType.VanillaBert, # 불러올 모델 프레임
-    pretrained_type: str = PreTrainedType.MultiLingual, # 모델에 활용할 Pretrained BERT Backbone 이름
-    num_classes: int = Config.NumClasses, # 카테고리 수
-    pooler_idx: int = 0, # 인코딩 결과로부터 추출할 hidden state. 0: [CLS]
-    load_state_dict: str = None, # (optional) 저장한 weight 경로
-    data_root: str = Config.Train, # 학습 데이터 경로
-    preprocess_type: str = PreProcessType.Base, # 텍스트 전처리 타입
+    model_type: str = ModelType.VanillaBert,  # 불러올 모델 프레임
+    pretrained_type: str = PreTrainedType.MultiLingual,  # 모델에 활용할 Pretrained BERT Backbone 이름
+    num_classes: int = Config.NumClasses,  # 카테고리 수
+    pooler_idx: int = 0,  # 인코딩 결과로부터 추출할 hidden state. 0: [CLS]
+    load_state_dict: str = None,  # (optional) 저장한 weight 경로
+    data_root: str = Config.Train,  # 학습 데이터 경로
+    preprocess_type: str = PreProcessType.Base,  # 텍스트 전처리 타입
     epochs: int = Config.Epochs,
-    valid_size: float = Config.ValidSize, # 학습 데이터 중 검증에 활용할 데이터 비율
+    valid_size: float = Config.ValidSize,  # 학습 데이터 중 검증에 활용할 데이터 비율
     train_batch_size: int = Config.Batch32,
     valid_batch_size: int = 512,
     optim_type: str = Optimizer.Adam,
@@ -42,14 +43,14 @@ def train(
     set_seed(seed)
 
     # load data
-    dataset = REDataset(
-        root=data_root, preprocess_type=preprocess_type, device=device
-    )
+    dataset = REDataset(root=data_root, preprocess_type=preprocess_type, device=device)
     if valid_size == 0:
-        is_valid = False # validation flag
-        train_loader = DataLoader(dataset, batch_size=train_batch_size, shuffle=True, drop_last=True)
+        is_valid = False  # validation flag
+        train_loader = DataLoader(
+            dataset, batch_size=train_batch_size, shuffle=True, drop_last=True
+        )
     else:
-        is_valid = True # validation flag
+        is_valid = True  # validation flag
         train_loader, valid_loader = split_train_test_loader(
             dataset=dataset,
             test_size=valid_size,
@@ -58,7 +59,9 @@ def train(
         )
 
     # load model
-    model = load_model(model_type, pretrained_type, num_classes, load_state_dict, pooler_idx)
+    model = load_model(
+        model_type, pretrained_type, num_classes, load_state_dict, pooler_idx
+    )
     model.to(device)
     model.train()
 
@@ -67,7 +70,7 @@ def train(
     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
     if lr_scheduler is not None:
         scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
-    
+
     # make checkpoint directory to save model during train
     checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
     if checkpoint_dir not in os.listdir(save_path):
@@ -122,12 +125,15 @@ def train(
                         f"First EP Train F1": train_eval["f1"],
                         f"First EP Train Loss": train_loss,
                     }
-                ) 
+                )
 
             # validation phase
             if (is_valid) and (idx != 0) and (idx % VALID_CYCLE == 0):
                 valid_eval, valid_loss = validate(
-                    model=model, model_type=model_type, valid_loader=valid_loader, criterion=criterion
+                    model=model,
+                    model_type=model_type,
+                    valid_loader=valid_loader,
+                    criterion=criterion,
                 )
                 verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
                 verbose(phase="Train", eval=train_eval, loss=train_loss)
@@ -165,32 +171,60 @@ def train(
         # Checkpoint: (1) Better Accuracy (2) Better Loss if accuracy is the same as before
         if is_valid:
             if save_path and valid_eval["accuracy"] > best_acc:
-                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss, TIMESTAMP)
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    valid_eval["accuracy"],
+                    valid_loss,
+                    TIMESTAMP,
+                )
                 best_acc = valid_eval["accuracy"]
                 best_loss = valid_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
-            elif save_path and valid_eval["accuracy"] == best_acc and best_loss > valid_loss:
-                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss, TIMESTAMP)
+            elif (
+                save_path
+                and valid_eval["accuracy"] == best_acc
+                and best_loss > valid_loss
+            ):
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    valid_eval["accuracy"],
+                    valid_loss,
+                    TIMESTAMP,
+                )
                 best_acc = valid_eval["accuracy"]
                 best_loss = valid_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
         else:
             if save_path and train_eval["accuracy"] > best_acc:
-                name = ckpt_name(model_type, pretrained_type, epoch, train_eval["accuracy"], train_loss, TIMESTAMP)
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    train_eval["accuracy"],
+                    train_loss,
+                    TIMESTAMP,
+                )
                 best_acc = train_eval["accuracy"]
                 best_loss = train_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
-            elif save_path and train_eval["accuracy"] == best_acc and best_loss > train_loss:
+            elif (
+                save_path
+                and train_eval["accuracy"] == best_acc
+                and best_loss > train_loss
+            ):
                 name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({train_eval['accuracy']:.4f})loss({train_loss})id({TIMESTAMP}).pth"
                 best_loss = train_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
-
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
 
 def validate(model, model_type, valid_loader, criterion):
@@ -199,7 +233,7 @@ def validate(model, model_type, valid_loader, criterion):
     total_loss = 0
     model.eval()
 
-    with torch.no_grad():    
+    with torch.no_grad():
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
             if model_type == ModelType.SequenceClf:
                 outputs = model(**sentences).logits
@@ -224,17 +258,16 @@ def validate(model, model_type, valid_loader, criterion):
         # evaluation phase
         valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
         valid_loss = total_loss / len(true_arr)
-        
+
     model.train()
 
     return valid_eval, valid_loss
 
 
-
 if __name__ == "__main__":
     TIMESTAMP = get_timestamp()
     LOAD_STATE_DICT = None
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-type", type=str, default=ModelType.VanillaBert)
     parser.add_argument(
@@ -264,7 +297,9 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int((TOTAL_SAMPLES * (1-args.valid_size)) / args.train_batch_size) - 1 # 학습 과정에서 2번만 검증
+    VALID_CYCLE = (
+        int((TOTAL_SAMPLES * (1 - args.valid_size)) / args.train_batch_size) - 1
+    )  # 학습 과정에서 2번만 검증
     print("=" * 100)
     print(args)
     print("=" * 100)

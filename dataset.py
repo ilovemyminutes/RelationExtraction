@@ -25,6 +25,7 @@ COLUMNS = [
     "label",
 ]
 
+
 class REDataset(Dataset):
     def __init__(
         self,
@@ -39,12 +40,12 @@ class REDataset(Dataset):
         self.device = device
 
     def __getitem__(self, idx) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
-        """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""        
+        """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""
         sentence = {
-            key: torch.as_tensor(val[idx]).to(self.device) # device 할당
+            key: torch.as_tensor(val[idx]).to(self.device)  # device 할당
             for key, val in self.inputs.items()
         }
-        label = torch.as_tensor(self.labels[idx]).to(self.device) # device 할당
+        label = torch.as_tensor(self.labels[idx]).to(self.device)  # device 할당
         return sentence, label
 
     def __len__(self):
@@ -78,6 +79,7 @@ class REDataset(Dataset):
 
 
 # TODO: K-Fold
+
 
 def split_train_test_loader(
     dataset: Dataset,

@@ -2,24 +2,24 @@ from dataclasses import dataclass
 from transformers import BertTokenizer, AutoTokenizer
 from config import PreProcessType, PreTrainedType
 
+
 @dataclass
 class SpecialToken:
     # Basic Special Tokens for BERT
-    SEP: str='[SEP]'
-    CLS: str='[CLS]'
-    
+    SEP: str = "[SEP]"
+    CLS: str = "[CLS]"
+
     # 무엇(entity1)은 무엇(entity2)과 어떤 관계이다.
-    E1Open: str='[E1]'
-    E1Close: str='[/E1]'
-    E2Open: str='[E2]'
-    E2Close: str='[/E2]'
+    E1Open: str = "[E1]"
+    E1Close: str = "[/E1]"
+    E2Open: str = "[E2]"
+    E2Close: str = "[/E2]"
 
     # 무엇(sub)은 무엇(obj)과 어떤 관계이다.
-    SUBOpen: str = '[SUB]'
-    SUBClose: str = '[/SUB]'
-    OBJOpen: str = '[OBJ]'
-    OBJClose: str = '[/OBJ]'
-    
+    SUBOpen: str = "[SUB]"
+    SUBClose: str = "[/SUB]"
+    OBJOpen: str = "[OBJ]"
+    OBJClose: str = "[/OBJ]"
 
 
 def load_tokenizer(type: str = PreProcessType.Base):
@@ -34,7 +34,7 @@ def load_tokenizer(type: str = PreProcessType.Base):
     """
     print("Load Tokenizer...", end="\t")
     if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
-        tokenizer = AutoTokenizer.from_pretrained(PreTrainedType.MultiLingual)
+        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
     else:
         raise NotImplementedError
     print("done!")

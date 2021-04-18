@@ -31,6 +31,7 @@ def get_timestamp():
     now2str = now.strftime("%Y%m%d%H%M%S")
     return now2str
 
+
 def verbose(phase: str, eval: dict, loss: float):
     acc = eval["accuracy"]
     f1 = eval["f1"]
@@ -39,6 +40,7 @@ def verbose(phase: str, eval: dict, loss: float):
     print(
         f"[{phase}] ACC: {acc:.4f} F1: {f1:.4f} PRC: {prc:.4f} REC: {rec:.4f} Loss: {loss:.4f}"
     )
+
 
 def ckpt_name(model_type, pretrained_type, epoch, score, loss, timestamp):
     name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({score:.4f})loss({loss:.4f})id({timestamp}).pth"

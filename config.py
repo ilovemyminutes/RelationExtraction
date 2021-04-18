@@ -26,16 +26,14 @@ class Config:
     NumClasses: int = 42
     Epochs: int = 3
 
-    Batch8:int = 8
+    Batch8: int = 8
     Batch16: int = 16
     Batch32: int = 32
     Batch64: int = 64
 
-    LRFaster: float = 0.01
-    LRFast: float = 0.005
-    LR: float = 0.001
-    LRSlow: float = 0.0005
-    LRSlower: float = 0.0001
+    LRFast: float = 5e-6
+    LR: float = 25e-7
+    LRSlow: float = 1e-7
 
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -60,15 +58,17 @@ class Loss:
 
 @dataclass
 class PreProcessType:
-    Base: str = "Base" # No preprocessing => 구려
-    ES: str = 'EntitySeparation' # Entity Separation, method as baseline of boostcamp itself
-    ESP: str = 'ESPositionEmbedding' # Entity Separation with Position Embedding, add scalar for each values in entities
+    Base: str = "Base"  # No preprocessing => 구려
+    ES: str = (
+        "EntitySeparation"  # Entity Separation, method as baseline of boostcamp itself
+    )
+    ESP: str = "ESPositionEmbedding"  # Entity Separation with Position Embedding, add scalar for each values in entities
     EM: str = "EntityMarker"  # Entity Marking
 
 
 @dataclass
 class ModelType:
-    VanillaBert: str = 'VanillaBert'
+    VanillaBert: str = "VanillaBert"
     Base: str = "BertModel"
     SequenceClf: str = "BertForSequenceClassification"
 
@@ -76,4 +76,4 @@ class ModelType:
 @dataclass
 class PreTrainedType:
     MultiLingual: str = "bert-base-multilingual-cased"
-    BaseUncased: str= "bert-base-uncased"
+    BaseUncased: str = "bert-base-uncased"

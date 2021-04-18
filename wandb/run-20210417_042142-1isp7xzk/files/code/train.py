@@ -17,6 +17,7 @@ warnings.filterwarnings("ignore")
 
 TOTAL_SAMPLES = 9000
 
+
 def train(
     model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.MultiLingual,
@@ -60,7 +61,7 @@ def train(
     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
     if lr_scheduler is not None:
         scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
-    
+
     # make checkpoint directory to save model during train
     checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
     if checkpoint_dir not in os.listdir(save_path):
@@ -114,7 +115,7 @@ def train(
                         # f"First EP Train REC": train_eval["recall"],
                         f"First EP Train Loss": train_loss,
                     }
-                ) 
+                )
 
             if idx != 0 and idx % VALID_CYCLE == 0:
                 valid_eval, valid_loss = validate(
@@ -151,21 +152,23 @@ def train(
         )
 
         # Checkpoint Condition
-            # 1. Better Accuracy
-            # 2. Better Loss if accuracy is the same as before
+        # 1. Better Accuracy
+        # 2. Better Loss if accuracy is the same as before
 
         if save_path and valid_eval["accuracy"] > best_acc:
             name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})loss({valid_loss})id({TIMESTAMP}).pth"
             best_acc = valid_eval["accuracy"]
             best_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
+            print(f"Model saved: {os.path.join(save_path, name)}")
 
-        elif save_path and valid_eval["accuracy"] == best_acc and best_loss > valid_loss:
+        elif (
+            save_path and valid_eval["accuracy"] == best_acc and best_loss > valid_loss
+        ):
             name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})loss({valid_loss})id({TIMESTAMP}).pth"
             best_loss = valid_loss
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
+            print(f"Model saved: {os.path.join(save_path, name)}")
 
 
 def validate(model, valid_loader, criterion):
@@ -240,7 +243,7 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int(TOTAL_SAMPLES * args.valid_size) // 2 # 학습 과정에서 2번만 검증
+    VALID_CYCLE = int(TOTAL_SAMPLES * args.valid_size) // 2  # 학습 과정에서 2번만 검증
     print("=" * 100)
     print(args)
     print("=" * 100)

@@ -149,8 +149,7 @@ def train(
             name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({valid_eval['accuracy']:.4f})id({TIMESTAMP}).pth"
             best_acc = valid_eval["accuracy"]
             torch.save(model.state_dict(), os.path.join(save_path, name))
-            print(f'Model saved: {os.path.join(save_path, name)}')
-            
+            print(f"Model saved: {os.path.join(save_path, name)}")
 
 
 def validate(model, valid_loader, criterion):

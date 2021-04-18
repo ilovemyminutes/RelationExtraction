@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore")
 
 TOTAL_SAMPLES = 9000
 
+
 def train(
     model_type: str = ModelType.SequenceClf,
     pretrained_type: str = PreTrainedType.MultiLingual,
@@ -45,10 +46,12 @@ def train(
         root=data_root, tokenization_type=tokenization_type, device=device
     )
     if valid_size == 0:
-        is_valid = False # validation flag
-        train_loader = DataLoader(dataset, batch_size=train_batch_size, shuffle=True, drop_last=True)
+        is_valid = False  # validation flag
+        train_loader = DataLoader(
+            dataset, batch_size=train_batch_size, shuffle=True, drop_last=True
+        )
     else:
-        is_valid = True # validation flag
+        is_valid = True  # validation flag
         train_loader, valid_loader = split_train_test_loader(
             dataset=dataset,
             test_size=valid_size,
@@ -66,7 +69,7 @@ def train(
     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
     if lr_scheduler is not None:
         scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
-    
+
     # make checkpoint directory to save model during train
     checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
     if checkpoint_dir not in os.listdir(save_path):
@@ -123,11 +126,14 @@ def train(
                         # f"First EP Train REC": train_eval["recall"],
                         f"First EP Train Loss": train_loss,
                     }
-                ) 
+                )
 
             if (is_valid) and (idx != 0) and (idx % VALID_CYCLE == 0):
                 valid_eval, valid_loss = validate(
-                    model=model, model_type=model_type, valid_loader=valid_loader, criterion=criterion
+                    model=model,
+                    model_type=model_type,
+                    valid_loader=valid_loader,
+                    criterion=criterion,
                 )
                 verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
                 verbose(phase="Train", eval=train_eval, loss=train_loss)
@@ -143,7 +149,6 @@ def train(
                         }
                     )
 
-        
         # logs for one epoch in total
         if is_valid:
             wandb.log(
@@ -174,32 +179,57 @@ def train(
         # Checkpoint: (1) Better Accuracy (2) Better Loss if accuracy is the same as before
         if is_valid:
             if save_path and valid_eval["accuracy"] > best_acc:
-                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss)
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    valid_eval["accuracy"],
+                    valid_loss,
+                )
                 best_acc = valid_eval["accuracy"]
                 best_loss = valid_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
-            elif save_path and valid_eval["accuracy"] == best_acc and best_loss > valid_loss:
-                name = ckpt_name(model_type, pretrained_type, epoch, valid_eval["accuracy"], valid_loss)
+            elif (
+                save_path
+                and valid_eval["accuracy"] == best_acc
+                and best_loss > valid_loss
+            ):
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    valid_eval["accuracy"],
+                    valid_loss,
+                )
                 best_acc = valid_eval["accuracy"]
                 best_loss = valid_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
         else:
             if save_path and train_eval["accuracy"] > best_acc:
-                name = ckpt_name(model_type, pretrained_type, epoch, train_eval["accuracy"], train_loss)
+                name = ckpt_name(
+                    model_type,
+                    pretrained_type,
+                    epoch,
+                    train_eval["accuracy"],
+                    train_loss,
+                )
                 best_acc = train_eval["accuracy"]
                 best_loss = train_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
-            elif save_path and train_eval["accuracy"] == best_acc and best_loss > train_loss:
+            elif (
+                save_path
+                and train_eval["accuracy"] == best_acc
+                and best_loss > train_loss
+            ):
                 name = f"{model_type}_{pretrained_type}_ep({epoch:0>2d})acc({train_eval['accuracy']:.4f})loss({train_loss})id({TIMESTAMP}).pth"
                 best_loss = train_loss
                 torch.save(model.state_dict(), os.path.join(save_path, name))
-                print(f'Model saved: {os.path.join(save_path, name)}')
-
+                print(f"Model saved: {os.path.join(save_path, name)}")
 
 
 def validate(model, model_type, valid_loader, criterion):
@@ -235,7 +265,6 @@ def validate(model, model_type, valid_loader, criterion):
     return valid_eval, valid_loss
 
 
-
 if __name__ == "__main__":
     LOAD_STATE_DICT = None
     TIMESTAMP = get_timestamp()
@@ -268,7 +297,9 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # train
-    VALID_CYCLE = int((TOTAL_SAMPLES * args.valid_size) / args.train_batch_size) - 1 # 학습 과정에서 2번만 검증
+    VALID_CYCLE = (
+        int((TOTAL_SAMPLES * args.valid_size) / args.train_batch_size) - 1
+    )  # 학습 과정에서 2번만 검증
     print("=" * 100)
     print(args)
     print("=" * 100)
