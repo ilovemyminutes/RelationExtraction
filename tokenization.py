@@ -33,7 +33,7 @@ def load_tokenizer(type: str = PreProcessType.Base):
     - tokenizer(BertTokenizer): 사전 학습된 tokenizer
     """
     print("Load Tokenizer...", end="\t")
-    if type == PreProcessType.Base:
+    if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
         tokenizer = BertTokenizer.from_pretrained(PreTrainedType.BertMultiLingual)
     else:
         raise NotImplementedError
