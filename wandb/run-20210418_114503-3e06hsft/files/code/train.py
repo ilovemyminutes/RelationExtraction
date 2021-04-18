@@ -1,10 +1,10 @@
 import argparse
 import os
 import warnings
+from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 import wandb
 from evaluation import evaluate
 from models import load_model
@@ -35,7 +35,7 @@ def train(
     optim_type: str = Optimizer.Adam,
     loss_type: str = Loss.CE,
     lr: float = Config.LR,
-    lr_scheduler: str = Optimizer.CosineAnnealing,
+    lr_scheduler: str = Optimizer.CosineScheduler,
     device: str = Config.Device,
     seed: int = Config.Seed,
     save_path: str = Config.CheckPoint,
@@ -72,9 +72,9 @@ def train(
 
     # load criterion, optimizer, scheduler
     criterion = get_criterion(type=loss_type)
-    optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
+    optimizer = get_optimizer(model=model, type=optim_type, lr=lr, num_training_steps=TOTAL_STEPS)
     if lr_scheduler is not None:
-        scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer, num_training_steps=TOTAL_STEPS)
+        scheduler = get_scheduler(type=lr_scheduler, optimizer=optimizer)
 
     # make checkpoint directory to save model during train
     checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
@@ -280,12 +280,12 @@ if __name__ == "__main__":
     parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch64)
     parser.add_argument("--valid-batch-size", type=int, default=512)
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LRSlower)
-    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
+    parser.add_argument("--lr", type=float, default=Config.LR)
+    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.LambdaLR)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)

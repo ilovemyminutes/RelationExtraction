@@ -3,6 +3,8 @@ from tokenization import SpecialToken as ST
 from config import PreProcessType
 
 
+POS = ['NNG', 'NNP', 'NNB', 'NNBC', 'NR', 'NP', 'VV', 'VA', 'XR']
+
 def preprocess_text(data: pd.DataFrame, method: str = PreProcessType.Base):
     """Preprocessing 방법에 따라 텍스트를 전처리하는 함수.
     data를 전처리한 후 토크나이저는 'input' 컬럼에 대해 토크나이징하게 됨

@@ -24,7 +24,7 @@ class Config:
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 3
+    Epochs: int = 15
 
     Batch8: int = 8
     Batch16: int = 16
@@ -50,7 +50,7 @@ class Optimizer:
     AdamW: str = "AdamW"
     SGD: str = "SGD"
     Momentum: str = "Momentum"
-    CosineScheduler: str = "CosineScheduler"
+    CosineAnnealing: str = "CosineScheduler"
     LambdaLR = "LambdaLR"
 
 

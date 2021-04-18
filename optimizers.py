@@ -20,11 +20,11 @@ def get_optimizer(model: nn.Module, type: str, lr: float):
     return optimizer
 
 
-def get_scheduler(type: str, optimizer):
-    if type == Optimizer.CosineScheduler:
+def get_scheduler(type: str, optimizer, num_training_steps: int):
+    if type == Optimizer.CosineAnnealing:
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50, eta_min=0)
     elif type == Optimizer.LambdaLR:
-        scheduler = get_linear_schedule_with_warmup(optimizer)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=100, num_training_steps=num_training_steps)
     else:
         raise NotImplementedError()
 

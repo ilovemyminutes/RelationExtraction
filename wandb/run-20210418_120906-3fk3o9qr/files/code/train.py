@@ -35,7 +35,7 @@ def train(
     optim_type: str = Optimizer.Adam,
     loss_type: str = Loss.CE,
     lr: float = Config.LR,
-    lr_scheduler: str = Optimizer.CosineAnnealing,
+    lr_scheduler: str = Optimizer.CosineScheduler,
     device: str = Config.Device,
     seed: int = Config.Seed,
     save_path: str = Config.CheckPoint,
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
     parser.add_argument("--lr", type=float, default=Config.LRSlower)
-    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
+    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.LambdaLR)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
