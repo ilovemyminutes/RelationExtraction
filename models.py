@@ -7,7 +7,7 @@ from dataset import REDataset, split_train_test_loader
 
 def load_model(
     model_type: str = ModelType.SequenceClf,
-    pretrained_type: str = PreTrainedType.BertMultiLingual,
+    pretrained_type: str = PreTrainedType.MultiLingual,
     num_classes: int = Config.NumClasses,
     load_state_dict: str = None,
     pooler_idx: int = 0,  # get last hidden state from CLS
@@ -40,14 +40,14 @@ def load_model(
 class VanillaBert(nn.Module):
     def __init__(
         self,
-        model_type: str,
-        pretrained_type: str,
-        num_labels: int = Config.NumClasses,
+        model_type: str=ModelType.SequenceClf, # BertForSequenceClassification
+        pretrained_type: str=PreTrainedType.MultiLingual, # bert-base-multilingual-cased
+        num_labels: int = Config.NumClasses, # 42
         pooler_idx: int = 0,
     ):
         super(VanillaBert, self).__init__()
-        # idx: index of hidden state to extract from output hidden states. It is CLS hidden states for index 0.
-        self.idx = 0 if pooler_idx in ["cls", 0] else pooler_idx
+        # BERT로부터 얻은 128(=max_length)개 hidden state 중 몇 번째를 활용할 지 결정. Default - 0(CLS 토큰의 인덱스)
+        self.idx = 0 if pooler_idx == 0 else pooler_idx
         self.backbone = self.load_bert(
             model_type=model_type,
             pretrained_type=pretrained_type,
@@ -64,7 +64,9 @@ class VanillaBert(nn.Module):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
         )
-        x = x.last_hidden_state[:, self.idx, :] # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
+
+        # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
+        x = x.last_hidden_state[:, self.idx, :] 
         x = self.layernorm(x)
         x = self.dropout(x)
         x = self.relu(x)
@@ -72,17 +74,13 @@ class VanillaBert(nn.Module):
         return output
 
     @staticmethod
-    def load_bert(model_type, pretrained_type, num_labels):
-        bert_config = BertConfig.from_pretrained(pretrained_type)
-        bert_config.num_labels = num_labels
-
+    def load_bert(model_type, pretrained_type):
         if model_type == ModelType.SequenceClf:
             model = BertForSequenceClassification.from_pretrained(
-                pretrained_type, config=bert_config
+                pretrained_type
             )
-            model = model.bert
-
-        elif model_type == ModelType.Base:
+            model = model.bert # 마지막 레이어을 제외한 BERT 아키텍쳐만을 backbone으로 사용
+        else:
             raise NotImplementedError()
 
         return model
