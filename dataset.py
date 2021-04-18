@@ -1,7 +1,8 @@
 import random
-from typing import Tuple
+from typing import Tuple, Dict
 import pandas as pd
 import torch
+from torch.functional import Tensor
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
@@ -25,9 +26,58 @@ COLUMNS = [
     "label",
 ]
 
+class REDataset(Dataset):
+    def __init__(
+        self,
+        root: str = Config.Train,
+        preprocess_type: str = PreProcessType.Base,
+        device: str = Config.Device,
+    ):
+        self.data = self._load_data(root, preprocess_type=preprocess_type)
+        self.tokenizer = load_tokenizer(type=preprocess_type)
+        self.inputs = self._tokenize(self.data)
+        self.labels = self.data["label"].tolist()
+        self.device = device
+
+    def __getitem__(self, idx) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""        
+        sentence = {
+            key: torch.as_tensor(val[idx]).to(self.device) # device 할당
+            for key, val in self.inputs.items()
+        }
+        label = torch.as_tensor(self.labels[idx]).to(self.device) # device 할당
+        return sentence, label
+
+    def __len__(self):
+        return len(self.labels)
+
+    def _tokenize(self, data):
+        print("Apply Tokenization...", end="\t")
+        data_tokenized = self.tokenizer(
+            data["input"].tolist(),
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=128,
+            add_special_tokens=True,
+        )
+        print("done!")
+        return data_tokenized
+
+    def _load_data(self, root: str, preprocess_type: str) -> pd.DataFrame:
+        enc = LabelEncoder()
+        print("Load raw data...", end="\t")
+        raw = pd.read_csv(root, sep="\t", header=None)
+        raw.columns = COLUMNS
+        raw = raw.drop("id", axis=1)
+        raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+        print(f"preprocessing for '{preprocess_type}'...", end="\t")
+        data = preprocess_text(raw, method=preprocess_type)
+        print("done!")
+        return data
+
 
 # TODO: K-Fold
-
 
 def split_train_test_loader(
     dataset: Dataset,
@@ -84,57 +134,6 @@ def split_train_test_loader(
     )
 
     return train_loader, test_loader
-
-
-class REDataset(Dataset):
-    def __init__(
-        self,
-        root: str = Config.Train,
-        preprocess_type: str = PreProcessType.Base,
-        device: str = Config.Device,
-    ):
-        self.data = self._load_data(root, preprocess_type=preprocess_type)
-        self.tokenizer = load_tokenizer(type=preprocess_type)
-        self.inputs = self._tokenize(self.data)
-        self.labels = self.data["label"].tolist()
-        self.device = device
-
-    def __getitem__(self, idx) -> Tuple[dict, torch.Tensor]:
-        """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""        
-        sentence = {
-            key: torch.as_tensor(val[idx]).to(self.device) # device 할당
-            for key, val in self.inputs.items()
-        }
-        label = torch.as_tensor(self.labels[idx]).to(self.device) # device 할당
-        return sentence, label
-
-    def __len__(self):
-        return len(self.labels)
-
-    def _tokenize(self, data):
-        print("Apply Tokenization...", end="\t")
-        data_tokenized = self.tokenizer(
-            data["input"].tolist(),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=128,
-            add_special_tokens=True,
-        )
-        print("done!")
-        return data_tokenized
-
-    def _load_data(self, root, preprocess_text):
-        enc = LabelEncoder()
-        print("Load raw data...", end="\t")
-        raw = pd.read_csv(root, sep="\t", header=None)
-        raw.columns = COLUMNS
-        raw = raw.drop("id", axis=1)
-        raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
-        print(f"preprocessing for '{preprocess_text}'...", end="\t")
-        data = preprocess_text(raw, method=preprocess_text)
-        print("done!")
-        return data
 
 
 # userd for EDA mainly
