@@ -265,7 +265,7 @@ def validate(model, model_type, valid_loader, criterion):
 
 
 if __name__ == "__main__":
-    TIMESTAMP = get_timestamp()  # used as an identifier in model save phase
+    TIMESTAMP = get_timestamp()  # used as an identifier
     LOAD_STATE_DICT = None
 
     parser = argparse.ArgumentParser()
@@ -280,12 +280,12 @@ if __name__ == "__main__":
     parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch64)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
     parser.add_argument("--valid-batch-size", type=int, default=512)
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
     parser.add_argument("--lr", type=float, default=Config.LR)
-    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.LambdaLR)
+    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineScheduler)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     # register logs to wandb
     name = (
         args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
-    )  # save file name: [MODEL-TYPE]_[PRETRAINED-TYPE]_[EPOCH][ACC][LOSS][ID].pth
+    )  # file name to save: [MODEL-TYPE]_[PRETRAINED-TYPE]_[EPOCH][ACC][LOSS][ID].pth
     run = wandb.init(project="pstage-klue", name=name, reinit=True)
     wandb.config.update(args)
 

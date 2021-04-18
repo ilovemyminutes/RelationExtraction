@@ -31,9 +31,11 @@ class Config:
     Batch32: int = 32
     Batch64: int = 64
 
-    LRFast: float = 5e-6
-    LR: float = 25e-7
-    LRSlow: float = 1e-7
+    LRFaster: float = 5e-5
+    LRFast: float = 25e-6
+    LR: float = 1e-6
+    LRSlow: float = 25e-7
+    LRSlower: float = 1e-7
 
     Seed: int = 42
     Device: str = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -45,9 +47,11 @@ class Config:
 class Optimizer:
     Adam: str = "Adam"
     AdamP: str = "AdamP"
+    AdamW: str = "AdamW"
     SGD: str = "SGD"
     Momentum: str = "Momentum"
     CosineScheduler: str = "CosineScheduler"
+    LambdaLR = "LambdaLR"
 
 
 @dataclass
