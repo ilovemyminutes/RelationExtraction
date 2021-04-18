@@ -1,0 +1,22 @@
+diff --git a/train.py b/train.py
+index e1d805e..64c80bf 100644
+--- a/train.py
++++ b/train.py
+@@ -89,7 +89,7 @@ def train(
+         true_list = []
+         total_loss = 0
+ 
+-        for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc="[Train]"):
++        for sentences, labels in tqdm(train_loader, desc="[Train]"):
+             outputs = model(**sentences)
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+diff --git a/wandb/latest-run b/wandb/latest-run
+index b15ab9f..210605b 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_095943-1twhkb2c
+\ No newline at end of file
++run-20210418_100221-1uryjy17
+\ No newline at end of file

@@ -70,7 +70,7 @@ class REDataset(Dataset):
         raw.columns = COLUMNS
         raw = raw.drop("id", axis=1)
         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
-        raw['label'] = raw[raw['label'] != 0].reset_index(drop=True)
+        raw = raw[raw['label'] != 0].reset_index(drop=True)
         print(f"preprocessing for '{preprocess_type}'...", end="\t")
         data = preprocess_text(raw, method=preprocess_type)
         print("done!")

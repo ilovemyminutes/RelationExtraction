@@ -63,7 +63,6 @@ class VanillaBert(nn.Module):
             token_type_ids=token_type_ids,
             attention_mask=attention_mask,
         )
-
         # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
         x = x.last_hidden_state[:, self.idx, :] 
         x = self.layernorm(x)

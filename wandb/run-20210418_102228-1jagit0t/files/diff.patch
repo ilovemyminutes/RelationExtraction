@@ -1,0 +1,134 @@
+diff --git a/dataset.py b/dataset.py
+index 4ba44dd..251ecbd 100644
+--- a/dataset.py
++++ b/dataset.py
+@@ -70,7 +70,7 @@ class REDataset(Dataset):
+         raw.columns = COLUMNS
+         raw = raw.drop("id", axis=1)
+         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+-        raw['label'] = raw[raw['label'] != 0].reset_index(drop=True)
++        raw = raw[raw['label'] != 0].reset_index(drop=True)
+         print(f"preprocessing for '{preprocess_type}'...", end="\t")
+         data = preprocess_text(raw, method=preprocess_type)
+         print("done!")
+diff --git a/models.py b/models.py
+index 683ee22..b95adac 100644
+--- a/models.py
++++ b/models.py
+@@ -63,7 +63,6 @@ class VanillaBert(nn.Module):
+             token_type_ids=token_type_ids,
+             attention_mask=attention_mask,
+         )
+-
+         # backbone으로부터 얻은 128(토큰 수)개 hidden state 중 어떤 것을 활용할 지 결정. Default - 0(CLS 토큰)
+         x = x.last_hidden_state[:, self.idx, :] 
+         x = self.layernorm(x)
+diff --git a/notebooks/Debug - Model Inference.ipynb b/notebooks/Debug - Model Inference.ipynb
+index 8922126..632741e 100644
+--- a/notebooks/Debug - Model Inference.ipynb	
++++ b/notebooks/Debug - Model Inference.ipynb	
+@@ -23,7 +23,7 @@
+  "cells": [
+   {
+    "cell_type": "code",
+-   "execution_count": 23,
++   "execution_count": 30,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+@@ -38,12 +38,72 @@
+     "from config import *\n",
+     "from transformers import BertModel, BertConfig, BertForSequenceClassification\n",
+     "from models import load_model, VanillaBert\n",
+-    "from dataset import REDataset\n",
++    "from dataset import REDataset, split_train_test_loader\n",
+     "from utils import set_seed\n",
+     "from criterions import *\n",
+     "from optimizers import *"
+    ]
+   },
++  {
++   "cell_type": "code",
++   "execution_count": 31,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "stream",
++     "name": "stdout",
++     "text": [
++      "Load raw data...\tpreprocessing for 'Base'...\tdone!\n",
++      "Load Tokenizer...\tdone!\n",
++      "Apply Tokenization...\tdone!\n"
++     ]
++    }
++   ],
++   "source": [
++    "data = REDataset()"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 34,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "train_loader, valid_loader = split_train_test_loader(data, 0.2)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 36,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "for sents, labels in train_loader:\n",
++    "    break"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 38,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "tensor([ 0,  0,  0,  4, 25,  9,  0, 22,  0,  0,  2,  3,  4,  2,  0, 10,  2,  0,\n",
++       "         0,  0,  3,  0,  2,  6, 10,  7,  0,  0,  2, 10,  0,  6],\n",
++       "       device='cuda:0')"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 38
++    }
++   ],
++   "source": [
++    "labels"
++   ]
++  },
+   {
+    "cell_type": "code",
+    "execution_count": 14,
+diff --git a/train.py b/train.py
+index e1d805e..64c80bf 100644
+--- a/train.py
++++ b/train.py
+@@ -89,7 +89,7 @@ def train(
+         true_list = []
+         total_loss = 0
+ 
+-        for idx, (sentences, labels) in tqdm(enumerate(train_loader), desc="[Train]"):
++        for sentences, labels in tqdm(train_loader, desc="[Train]"):
+             outputs = model(**sentences)
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+diff --git a/wandb/latest-run b/wandb/latest-run
+index b15ab9f..178711f 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_095943-1twhkb2c
+\ No newline at end of file
++run-20210418_102228-1jagit0t
+\ No newline at end of file
