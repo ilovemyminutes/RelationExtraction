@@ -24,7 +24,7 @@ class Config:
     Label: str = LABEL if os.path.isfile(LABEL) else DOT + LABEL
     Logs: str = LOGS if os.path.isfile(LOGS) else DOT + LOGS
     NumClasses: int = 42
-    Epochs: int = 15
+    Epochs: int = 20
 
     Batch8: int = 8
     Batch16: int = 16
@@ -62,7 +62,7 @@ class Loss:
 
 @dataclass
 class PreProcessType:
-    Base: str = "Base"  # No preprocessing => 구려
+    Base: str = "Base"  # No preprocessing
     ES: str = (
         "EntitySeparation"  # Entity Separation, method as baseline of boostcamp itself
     )
@@ -73,6 +73,7 @@ class PreProcessType:
 @dataclass
 class ModelType:
     VanillaBert: str = "VanillaBert"
+    VanillaBert_v2: str = "VanillaBert_v2"
     Base: str = "BertModel"
     SequenceClf: str = "BertForSequenceClassification"
 

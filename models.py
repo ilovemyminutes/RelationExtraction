@@ -11,6 +11,7 @@ def load_model(
     num_classes: int = Config.NumClasses,
     load_state_dict: str = None,
     pooler_idx: int = 0,  # get last hidden state from CLS
+    dropout: float = 0.5
 ):
     print("Load Model...", end="\t")
     # make BERT configuration
@@ -30,6 +31,7 @@ def load_model(
             pretrained_type=pretrained_type,
             num_labels=num_classes,
             pooler_idx=pooler_idx,
+            dropout=dropout
         )
     else:
         raise NotImplementedError()
@@ -42,6 +44,47 @@ def load_model(
     return model
 
 
+class VanillaBert_v2(nn.Module):
+    def __init__(
+        self,
+        model_type: str = ModelType.SequenceClf,  # BertForSequenceClassification
+        pretrained_type: str = PreTrainedType.MultiLingual,  # bert-base-multilingual-cased
+        num_labels: int = Config.NumClasses,  # 42
+        pooler_idx: int = 0
+    ):
+        super(VanillaBert_v2, self).__init__()
+        bert = self.load_bert(
+            model_type=model_type,
+            pretrained_type=pretrained_type,
+        )
+        self.backbone = bert.bert
+        self.dropout = bert.dropout
+        self.clf = bert.classifier
+        self.idx = 0 if pooler_idx == 0 else pooler_idx
+
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        x = self.backbone(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+        )
+        x = x.last_hidden_state[:, self.idx, :]
+        x = self.dropout(x)
+        output = self.clf(x)
+        return output
+
+    @staticmethod
+    def load_bert(model_type, pretrained_type):
+        config = BertConfig.from_pretrained(pretrained_type)
+        config.num_labels = 42
+        if model_type == ModelType.SequenceClf:
+            model = BertForSequenceClassification.from_pretrained(pretrained_type, config=config)
+        else:
+            raise NotImplementedError()
+
+        return model
+
+
 class VanillaBert(nn.Module):
     def __init__(
         self,
@@ -49,6 +92,7 @@ class VanillaBert(nn.Module):
         pretrained_type: str = PreTrainedType.MultiLingual,  # bert-base-multilingual-cased
         num_labels: int = Config.NumClasses,  # 42
         pooler_idx: int = 0,
+        dropout: float = 0.5,
     ):
         super(VanillaBert, self).__init__()
         # BERT로부터 얻은 128(=max_length)개 hidden state 중 몇 번째를 활용할 지 결정. Default - 0(CLS 토큰의 인덱스)
@@ -58,7 +102,7 @@ class VanillaBert(nn.Module):
             pretrained_type=pretrained_type,
         )
         self.layernorm = nn.LayerNorm(768)  # 768: output length of backbone, BERT
-        self.dropout = nn.Dropout()
+        self.dropout = nn.Dropout(p=dropout)
         self.relu = nn.ReLU()
         self.linear = nn.Linear(in_features=768, out_features=num_labels)
 
