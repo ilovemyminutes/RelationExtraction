@@ -2,8 +2,9 @@ import pandas as pd
 from tokenization import SpecialToken as ST
 from config import PreProcessType
 
+ENTITY_COLS = ["e1_start", "e1_end", "e2_start", "e2_end"]
+POS = ["NNG", "NNP", "NNB", "NNBC", "NR", "NP", "VV", "VA", "XR"]
 
-POS = ['NNG', 'NNP', 'NNB', 'NNBC', 'NR', 'NP', 'VV', 'VA', 'XR']
 
 def preprocess_text(data: pd.DataFrame, method: str = PreProcessType.Base):
     """Preprocessing 방법에 따라 텍스트를 전처리하는 함수.
@@ -29,7 +30,35 @@ def preprocess_text(data: pd.DataFrame, method: str = PreProcessType.Base):
         return data
 
     elif method == PreProcessType.EM:
-        pass
+        data["input"] = data.apply(lambda x: attach_entities(x), axis=1)
+        return data
 
     else:
         raise NotImplementedError(f"There's no method for '{method}'")
+
+
+def attach_entities(row: pd.Series):
+    sentence = row["relation_state"]
+    e1_open, e1_close, e2_open, e2_close = row[ENTITY_COLS].values
+    output = ""
+    if e1_open > e2_open:
+        output += sentence[:e2_open]
+        output += ST.E2Open
+        output += sentence[e2_open : e2_close + 1]
+        output += ST.E2Close
+        output += sentence[e2_close + 1 : e1_open]
+        output += ST.E1Open
+        output += sentence[e1_open : e1_close + 1]
+        output += ST.E1Close
+        output += sentence[e1_close + 1 :]
+    else:
+        output += sentence[:e1_open]
+        output += ST.E1Open
+        output += sentence[e1_open : e1_close + 1]
+        output += ST.E1Close
+        output += sentence[e1_close + 1 : e2_open]
+        output += ST.E2Open
+        output += sentence[e2_open : e2_close + 1]
+        output += ST.E2Close
+        output += sentence[e2_close + 1 :]
+    return output
