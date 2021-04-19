@@ -97,11 +97,12 @@ def train(
         total_loss = 0
 
         for sentences, labels in tqdm(train_loader, desc="[Train]"):
-            if model_type == ModelType.VanillaBert:
+            if model_type == ModelType.SequenceClf:
+                loss, outputs = model(**sentences, labels=labels).values()
+            else:
                 outputs = model(**sentences)
                 loss = criterion(outputs, labels)
-            else:
-                loss, outputs = model(**sentences, labels=labels).values()
+                
 
             total_loss += loss.item()
 
@@ -246,11 +247,12 @@ def validate(model, model_type, valid_loader, criterion):
 
     with torch.no_grad():
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
-            if model_type == ModelType.VanillaBert:
+            if model_type == ModelType.SequenceClf:
+                loss, outputs = model(**sentences, labels=labels).values()
+            else:
                 outputs = model(**sentences)
                 loss = criterion(outputs, labels)
-            else:
-                loss, outputs = model(**sentences, labels=labels).values()
+                
             total_loss += loss.item()
 
             _, preds = torch.max(outputs, dim=1)
@@ -286,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.8)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
     parser.add_argument("--data-root", type=str, default=Config.Train)
-    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
+    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.EM)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
     parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
@@ -302,6 +304,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.model_type == ModelType.SequenceClf:
         args.loss_type = Loss.CE
+        args.dropout = None
 
     # register logs to wandb
     name = (

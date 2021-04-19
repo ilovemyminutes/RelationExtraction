@@ -1,0 +1,85 @@
+diff --git a/config.py b/config.py
+index 3cdd441..5853680 100644
+--- a/config.py
++++ b/config.py
+@@ -62,7 +62,7 @@ class Loss:
+ 
+ @dataclass
+ class PreProcessType:
+-    Base: str = "Base"  # No preprocessing => 구려
++    Base: str = "Base"  # No preprocessing
+     ES: str = (
+         "EntitySeparation"  # Entity Separation, method as baseline of boostcamp itself
+     )
+diff --git a/tokenization.py b/tokenization.py
+index e27ad8d..5aa421e 100644
+--- a/tokenization.py
++++ b/tokenization.py
+@@ -9,18 +9,16 @@ class SpecialToken:
+     SEP: str = "[SEP]"
+     CLS: str = "[CLS]"
+ 
++    # 무엇(entity)은 무엇(entity)과 어떤 관계이다.
++    EOpen: str = "[ENT]"
++    EClose: str = "[/ENT]"
++    
+     # 무엇(entity1)은 무엇(entity2)과 어떤 관계이다.
+     E1Open: str = "[E1]"
+     E1Close: str = "[/E1]"
+     E2Open: str = "[E2]"
+     E2Close: str = "[/E2]"
+-
+-    # 무엇(sub)은 무엇(obj)과 어떤 관계이다.
+-    SUBOpen: str = "[SUB]"
+-    SUBClose: str = "[/SUB]"
+-    OBJOpen: str = "[OBJ]"
+-    OBJClose: str = "[/OBJ]"
+-
++    
+ 
+ def load_tokenizer(type: str = PreProcessType.Base):
+     """사전 학습된 tokenizer를 불러오는 함수
+diff --git a/train.py b/train.py
+index dec525c..3121bf2 100644
+--- a/train.py
++++ b/train.py
+@@ -235,12 +235,7 @@ def validate(model, model_type, valid_loader, criterion):
+ 
+     with torch.no_grad():
+         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
+-            if model_type == ModelType.SequenceClf:
+-                outputs = model(**sentences).logits
+-            elif model_type == ModelType.Base:
+-                outputs = model(**sentences).pooler_output
+-            else:
+-                outputs = model(**sentences)
++            outputs = model(**sentences)
+ 
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+@@ -277,14 +272,14 @@ if __name__ == "__main__":
+     parser.add_argument("--pooler-idx", type=int, default=0)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+     parser.add_argument("--data-root", type=str, default=Config.Train)
+-    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
++    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.Base)
+     parser.add_argument("--epochs", type=int, default=Config.Epochs)
+     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
+     parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+     parser.add_argument("--valid-batch-size", type=int, default=512)
+     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
+     parser.add_argument("--loss-type", type=str, default=Loss.CE)
+-    parser.add_argument("--lr", type=float, default=Config.LRSlower)
++    parser.add_argument("--lr", type=float, default=Config.LRSlow)
+     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
+     parser.add_argument("--device", type=str, default=Config.Device)
+     parser.add_argument("--seed", type=int, default=Config.Seed)
+diff --git a/wandb/latest-run b/wandb/latest-run
+index f1bf844..360c3d1 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_123951-2v936pyt
+\ No newline at end of file
++run-20210418_151642-3tm6h69y
+\ No newline at end of file

@@ -68,6 +68,7 @@ class PreProcessType:
     )
     ESP: str = "ESPositionEmbedding"  # Entity Separation with Position Embedding, add scalar for each values in entities
     EM: str = "EntityMarker"  # Entity Marking
+    EMSP: str = "EntityMarkerSeparationPositionEmbedding"
 
 
 @dataclass

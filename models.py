@@ -33,6 +33,13 @@ def load_model(
             pooler_idx=pooler_idx,
             dropout=dropout
         )
+    elif model_type == ModelType.VanillaBert_v2:
+        model = VanillaBert_v2(
+            model_type=ModelType.SequenceClf,
+            pretrained_type=pretrained_type,
+            num_labels=num_classes,
+            pooler_idx=pooler_idx
+        )
     else:
         raise NotImplementedError()
 
@@ -56,6 +63,7 @@ class VanillaBert_v2(nn.Module):
         bert = self.load_bert(
             model_type=model_type,
             pretrained_type=pretrained_type,
+            num_labels=num_labels
         )
         self.backbone = bert.bert
         self.dropout = bert.dropout
@@ -74,9 +82,9 @@ class VanillaBert_v2(nn.Module):
         return output
 
     @staticmethod
-    def load_bert(model_type, pretrained_type):
+    def load_bert(model_type, pretrained_type, num_labels):
         config = BertConfig.from_pretrained(pretrained_type)
-        config.num_labels = 42
+        config.num_labels = num_labels
         if model_type == ModelType.SequenceClf:
             model = BertForSequenceClassification.from_pretrained(pretrained_type, config=config)
         else:

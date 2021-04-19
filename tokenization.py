@@ -26,41 +26,41 @@ class SpecialToken:
     E2Close: str = "[/E2]"
 
 
-def tokenize(sentences, tokenizer, preprocess_type: str):
+def tokenize(sentence, tokenizer, type: str=PreProcessType.Base) -> dict:
     outputs = tokenizer(
-        sentences,
+        sentence,
         return_tensors="pt",
-        padding=True,
+        padding="max_length",
         truncation=True,
-        max_length=100,
+        max_length=128,
         add_special_tokens=True,
     )
-    if preprocess_type != PreProcessType.Base:
-        tokenized = tokenizer.tokenize(sentences)
+    if type != PreProcessType.Base:
+        tokenized = tokenizer.tokenize(sentence)
 
-        if preprocess_type == PreProcessType.EM:
+        if type == PreProcessType.EM:
             # Add embedding value for entity marker tokens([E1], [/E1], [E2], [/E2])
             entity_indices = find_entity_indices(tokenized)
             for open, close in entity_indices.values():
-                outputs.token_type_ids[
+                outputs.token_type_ids[0][
                     OFFSET + open : OFFSET + close + 1
                 ] += ENTITY_SCORE
 
-        elif preprocess_type == PreProcessType.ESP:
+        elif type == PreProcessType.ESP:
             # Add embedding value for separation token([SEP])
             last_sep_idx = fine_sep_indices(tokenized).pop()
-            outputs.token_type_ids[OFFSET : last_sep_idx + 1] += SEP_SCORE
+            outputs.token_type_ids[0][OFFSET : last_sep_idx + 1] += SEP_SCORE
             return outputs
 
-        elif preprocess_type == PreProcessType.EMSP:
+        elif type == PreProcessType.EMSP:
             entity_indices = find_entity_indices(tokenized)
             for (open, close) in entity_indices.values():
-                outputs.token_type_ids[
+                outputs.token_type_ids[0][
                     OFFSET + open : OFFSET + close + 1
                 ] += ENTITY_SCORE
 
             last_sep_idx = fine_sep_indices(tokenized).pop()
-            outputs.token_type_ids[OFFSET : last_sep_idx + 1] += SEP_SCORE
+            outputs.token_type_ids[0][OFFSET : last_sep_idx + 1] += SEP_SCORE
 
     return outputs
 
@@ -72,8 +72,8 @@ def find_entity_indices(tokenized: list) -> dict:
             tokenized.index(SpecialToken.E1Close),
         ),
         "e2": (
-            tokenized.index(SpecialToken.E1Open),
-            tokenized.index(SpecialToken.E1Close),
+            tokenized.index(SpecialToken.E2Open),
+            tokenized.index(SpecialToken.E2Close),
         ),
     }
     return entity_indices
@@ -94,7 +94,7 @@ def load_tokenizer(type: str = PreProcessType.Base):
     ---
     - tokenizer(BertTokenizer): 사전 학습된 tokenizer
     """
-    print("Load Tokenizer...", end="\t")
+    print(f"Load Tokenizer for {type}...", end="\t")
     if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
         tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
 
@@ -115,3 +115,9 @@ def load_tokenizer(type: str = PreProcessType.Base):
         raise NotImplementedError
     print("done!")
     return tokenizer
+
+
+if __name__ == '__main__':
+    tokenizer = load_tokenizer(PreProcessType.EM)
+    sentence = '영국에서 사용되는 스포츠 유틸리티 [E2]자동차[/E2]의 브랜드로는 [E1]랜드로버[/E1](Land Rover)와 지프(Jeep)가 있으며, 이 브랜드들은 자동차의 종류를 일컫는 말로 사용되기도 한다.'
+    tokenize(sentence, tokenizer, PreProcessType.EM)

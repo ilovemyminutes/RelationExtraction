@@ -1,0 +1,355 @@
+diff --git a/config.py b/config.py
+index 3cdd441..5853680 100644
+--- a/config.py
++++ b/config.py
+@@ -62,7 +62,7 @@ class Loss:
+ 
+ @dataclass
+ class PreProcessType:
+-    Base: str = "Base"  # No preprocessing => 구려
++    Base: str = "Base"  # No preprocessing
+     ES: str = (
+         "EntitySeparation"  # Entity Separation, method as baseline of boostcamp itself
+     )
+diff --git a/notebooks/Sketch ESP.ipynb b/notebooks/Sketch ESP.ipynb
+index 1864f96..48a9157 100644
+--- a/notebooks/Sketch ESP.ipynb	
++++ b/notebooks/Sketch ESP.ipynb	
+@@ -15,7 +15,7 @@
+   "orig_nbformat": 2,
+   "kernelspec": {
+    "name": "python377jvsc74a57bd098b0a9b7b4eaaa670588a142fd0a9b87eaafe866f1db4228be72b4211d12040f",
+-   "display_name": "Python 3.7.7 64-bit"
++   "display_name": "Python 3.7.7 64-bit ('base': conda)"
+   }
+  },
+  "nbformat": 4,
+@@ -23,7 +23,7 @@
+  "cells": [
+   {
+    "cell_type": "code",
+-   "execution_count": 47,
++   "execution_count": 6,
+    "metadata": {},
+    "outputs": [],
+    "source": [
+@@ -43,7 +43,7 @@
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 3,
++   "execution_count": 7,
+    "metadata": {},
+    "outputs": [
+     {
+@@ -57,32 +57,26 @@
+     }
+    ],
+    "source": [
+-    "data = REDataset()"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 7,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
++    "data = REDataset()\n",
++    "raw = pd.read_csv(Config.Train, sep='\\t', header=None, names=COLUMNS)\n",
++    "raw = raw.drop(['id'], axis=1)\n",
+     "tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 13,
++   "execution_count": 8,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "execute_result",
+      "data": {
+       "text/plain": [
+-       "2"
++       "4"
+       ]
+      },
+      "metadata": {},
+-     "execution_count": 13
++     "execution_count": 8
+     }
+    ],
+    "source": [
+@@ -93,88 +87,94 @@
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 72,
++   "execution_count": 108,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "raw['tokenized'] = raw['relation_state'].apply(lambda x: tagger.pos(x))"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 32,
+    "metadata": {},
+    "outputs": [
+     {
+-     "output_type": "execute_result",
+-     "data": {
+-      "text/plain": [
+-       "'영국에서 사용되는 스포츠 유틸리티 자동차의 브랜드로는 랜드로버(Land Rover)와 지프(Jeep)가 있으며, 이 브랜드들은 자동차의 종류를 일컫는 말로 사용되기도 한다.'"
+-      ]
+-     },
+-     "metadata": {},
+-     "execution_count": 72
++     "output_type": "stream",
++     "name": "stdout",
++     "text": [
++      "영국에서 사용되는 스포츠 유틸리티 자동차의 브랜드로는 랜드로버(Land Rover)와 지프(Jeep)가 있으며, 이 브랜드들은 자동차의 종류를 일컫는 말로 사용되기도 한다.\n"
++     ]
+     }
+    ],
+    "source": [
+-    "sample"
++    "IDX = 0\n",
++    "tagger = Mecab()\n",
++    "sample = data.data['relation_state'].tolist()[IDX]\n",
++    "print(sample)\n",
++    "sample_pos = tagger.pos(sample)"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 102,
++   "execution_count": 27,
+    "metadata": {},
+    "outputs": [
+     {
+      "output_type": "execute_result",
+      "data": {
+       "text/plain": [
+-       "<re.Match object; span=(34, 46), match='(Land Rover)'>"
++       "['(', ')', '-', '.']"
+       ]
+      },
+      "metadata": {},
+-     "execution_count": 102
++     "execution_count": 27
+     }
+    ],
+    "source": [
+-    "re.search(r\"\\([a-zA-Z가-힣0-9\\s?]+\\)\", sample)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 20,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": []
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 70,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "raw = pd.read_csv(Config.Train, sep='\\t', header=None, names=COLUMNS)\n",
+-    "raw = raw.drop(['id'], axis=1)"
+-   ]
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 104,
+-   "metadata": {},
+-   "outputs": [],
+-   "source": [
+-    "tagger = Mecab()"
++    "# 특수문자만 선택\r\n",
++    "re.sub(r\"[^\\s가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]\", sample)"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 108,
++   "execution_count": 33,
+    "metadata": {},
+-   "outputs": [],
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "['(Land Rover)', '(Jeep)']"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 33
++    }
++   ],
+    "source": [
+-    "raw['tokenized'] = raw['relation_state'].apply(lambda x: tagger.pos(x))"
++    "# 특수문자만 선택\n",
++    "re.sub(r\"\\([^)]*\\)\", sample)"
+    ]
+   },
+   {
+    "cell_type": "code",
+-   "execution_count": 115,
++   "execution_count": 23,
+    "metadata": {},
+-   "outputs": [],
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "'유럽 축구 연맹(UEFA) 집행위원회는 2014년 1월 24일에 열린 회의를 통해 2017년 대회부터 UEFA U-21 축구 선수권 대회 참가국을 8개국에서 12개국으로 확대하기로 결정했다.'"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 23
++    }
++   ],
+    "source": [
+-    "IDX = 1\n",
+-    "sample = data.data['relation_state'].tolist()[IDX]\n",
+-    "sample_pos = tagger.pos(sample)"
++    "sample"
+    ]
+   },
+   {
+@@ -217,6 +217,44 @@
+     "data.data.head()"
+    ]
+   },
++  {
++   "cell_type": "code",
++   "execution_count": null,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "sa"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": null,
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "REMOVE = ['(', ')']"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 16,
++   "metadata": {},
++   "outputs": [
++    {
++     "output_type": "execute_result",
++     "data": {
++      "text/plain": [
++       "<dataset.REDataset at 0x7f36713dfc90>"
++      ]
++     },
++     "metadata": {},
++     "execution_count": 16
++    }
++   ],
++   "source": [
++    "data\n"
++   ]
++  },
+   {
+    "cell_type": "code",
+    "execution_count": 116,
+@@ -297,9 +335,7 @@
+      "execution_count": 114
+     }
+    ],
+-   "source": [
+-    "['NNG', 'NNP' 'NNB' 'NNBC' 'NR' 'NP' 'VV' 'VA' 'XR']"
+-   ]
++   "source": []
+   }
+  ]
+ }
+\ No newline at end of file
+diff --git a/tokenization.py b/tokenization.py
+index e27ad8d..5aa421e 100644
+--- a/tokenization.py
++++ b/tokenization.py
+@@ -9,18 +9,16 @@ class SpecialToken:
+     SEP: str = "[SEP]"
+     CLS: str = "[CLS]"
+ 
++    # 무엇(entity)은 무엇(entity)과 어떤 관계이다.
++    EOpen: str = "[ENT]"
++    EClose: str = "[/ENT]"
++    
+     # 무엇(entity1)은 무엇(entity2)과 어떤 관계이다.
+     E1Open: str = "[E1]"
+     E1Close: str = "[/E1]"
+     E2Open: str = "[E2]"
+     E2Close: str = "[/E2]"
+-
+-    # 무엇(sub)은 무엇(obj)과 어떤 관계이다.
+-    SUBOpen: str = "[SUB]"
+-    SUBClose: str = "[/SUB]"
+-    OBJOpen: str = "[OBJ]"
+-    OBJClose: str = "[/OBJ]"
+-
++    
+ 
+ def load_tokenizer(type: str = PreProcessType.Base):
+     """사전 학습된 tokenizer를 불러오는 함수
+diff --git a/train.py b/train.py
+index dec525c..3121bf2 100644
+--- a/train.py
++++ b/train.py
+@@ -235,12 +235,7 @@ def validate(model, model_type, valid_loader, criterion):
+ 
+     with torch.no_grad():
+         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
+-            if model_type == ModelType.SequenceClf:
+-                outputs = model(**sentences).logits
+-            elif model_type == ModelType.Base:
+-                outputs = model(**sentences).pooler_output
+-            else:
+-                outputs = model(**sentences)
++            outputs = model(**sentences)
+ 
+             loss = criterion(outputs, labels)
+             total_loss += loss.item()
+@@ -277,14 +272,14 @@ if __name__ == "__main__":
+     parser.add_argument("--pooler-idx", type=int, default=0)
+     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
+     parser.add_argument("--data-root", type=str, default=Config.Train)
+-    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
++    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.Base)
+     parser.add_argument("--epochs", type=int, default=Config.Epochs)
+     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
+     parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+     parser.add_argument("--valid-batch-size", type=int, default=512)
+     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
+     parser.add_argument("--loss-type", type=str, default=Loss.CE)
+-    parser.add_argument("--lr", type=float, default=Config.LRSlower)
++    parser.add_argument("--lr", type=float, default=Config.LRSlow)
+     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
+     parser.add_argument("--device", type=str, default=Config.Device)
+     parser.add_argument("--seed", type=int, default=Config.Seed)
+diff --git a/wandb/latest-run b/wandb/latest-run
+index f1bf844..29ccf55 120000
+--- a/wandb/latest-run
++++ b/wandb/latest-run
+@@ -1 +1 @@
+-run-20210418_123951-2v936pyt
+\ No newline at end of file
++run-20210418_154255-sk42e8py
+\ No newline at end of file

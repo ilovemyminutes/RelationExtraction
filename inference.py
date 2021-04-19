@@ -69,7 +69,7 @@ def get_model_pretrained_type(load_state_dict: str):
 
 
 if __name__ == "__main__":
-    MODELNAME = "VanillaBert_bert-base-multilingual-cased_20210418164452/VanillaBert_bert-base-multilingual-cased_ep(02)acc(0.4878)loss(0.0048)id(20210418164452).pth"
+    MODELNAME = "BertForSequenceClassification_bert-base-multilingual-cased_20210419121332/BertForSequenceClassification_bert-base-multilingual-cased_ep(16)acc(0.7200)loss(0.0024)id(20210419121332).pth"
     LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)
 
     parser = argparse.ArgumentParser()
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--data-root", type=str, default=Config.Test)
-    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.Base)
+    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--save-path", type=str, default=Config.SavePath)
     args = parser.parse_args()

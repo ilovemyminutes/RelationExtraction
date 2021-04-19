@@ -44,10 +44,11 @@ class REDataset(Dataset):
         """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""
         sentence = tokenize(self.inputs[idx], self.tokenizer, self.preprocess_type)
 
+        # device 할당
         for key in sentence.keys():
             sentence[key] = sentence[key].to(self.device)
 
-        label = torch.as_tensor(self.labels[idx]).to(self.device)  # device 할당
+        label = torch.as_tensor(self.labels[idx]).to(self.device)  
         return sentence, label
 
     def __len__(self):

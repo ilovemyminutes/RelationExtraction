@@ -7,3 +7,4 @@ transformers==4.2.0
 g2pK==0.9.4
 konlpy==0.5.2
 adamp==0.3.0
+pykospacing @ git+https://github.com/haven-jeon/PyKoSpacing.git@1a36be492cc396559e7dce7825843af020ea231f
