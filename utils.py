@@ -1,4 +1,5 @@
 import pickle
+import json
 import datetime
 import random
 import numpy as np
@@ -10,6 +11,17 @@ def load_pickle(path: str):
         output = pickle.load(pkl_file)
     return output
 
+def save_json(path: str, f: object) -> None:
+    with open(path, "w") as json_path:
+        json.dump(
+            f,
+            json_path,
+        )
+
+def load_json(path: str) -> dict:
+    with open(path, "r") as json_file:
+        output = json.load(json_file)
+    return output
 
 def set_seed(seed: int = 42, contain_cuda: bool = False):
     random.seed(seed)
@@ -23,7 +35,6 @@ def set_seed(seed: int = 42, contain_cuda: bool = False):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     print(f"Seed set as {seed}")
-
 
 def get_timestamp():
     KST = datetime.timezone(datetime.timedelta(hours=9))
