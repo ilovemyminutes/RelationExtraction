@@ -8,14 +8,14 @@ from torch.utils.data import DataLoader
 import wandb
 from evaluation import evaluate
 from models import load_model
-from dataset import REDataset, split_train_test_loader
+from dataset import REDataset, REDataset_fix, split_train_test_loader
 from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from utils import get_timestamp, get_timestamp, set_seed, verbose, ckpt_name, save_json
 from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
 
 warnings.filterwarnings("ignore")
-
+# os.environ[ "TF_FORCE_GPU_ALLOW_GROWTH" ] = "true"
 
 TOTAL_SAMPLES = 9000
 
@@ -45,7 +45,7 @@ def train(
     set_seed(seed)
 
     # load data
-    dataset = REDataset(root=data_root, preprocess_type=preprocess_type, device=device)
+    dataset = REDataset_fix(root=data_root, preprocess_type=preprocess_type, device=device)
 
     # 학습 데이터를 분리하지 않을 경우
     if valid_size == 0:
@@ -68,6 +68,7 @@ def train(
     model = load_model(
         model_type, pretrained_type, num_classes, load_state_dict, pooler_idx, dropout
     )
+    model.resize_token_embeddings(len(dataset.tokenizer))
     model.to(device)
     model.train()
 
@@ -98,12 +99,14 @@ def train(
 
         for sentences, labels in tqdm(train_loader, desc="[Train]"):
             if model_type == ModelType.SequenceClf:
-                loss, outputs = model(**sentences, labels=labels).values()
+                input_ids = sentences['input_ids']
+                token_type_ids = sentences['token_type_ids']
+                attention_mask = sentences['attention_mask']
+                loss, outputs = model(input_ids, token_type_ids, attention_mask, labels=labels).values()
             else:
                 outputs = model(**sentences)
                 loss = criterion(outputs, labels)
                 
-
             total_loss += loss.item()
 
             # backpropagation
@@ -248,7 +251,10 @@ def validate(model, model_type, valid_loader, criterion):
     with torch.no_grad():
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
             if model_type == ModelType.SequenceClf:
-                loss, outputs = model(**sentences, labels=labels).values()
+                input_ids = sentences['input_ids']
+                token_type_ids = sentences['token_type_ids']
+                attention_mask = sentences['attention_mask']
+                loss, outputs = model(input_ids, token_type_ids, attention_mask, labels=labels).values()
             else:
                 outputs = model(**sentences)
                 loss = criterion(outputs, labels)
@@ -288,7 +294,7 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.8)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
     parser.add_argument("--data-root", type=str, default=Config.Train)
-    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.EM)
+    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ESP)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
     parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)

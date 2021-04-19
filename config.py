@@ -77,6 +77,7 @@ class ModelType:
     VanillaBert_v2: str = "VanillaBert_v2"
     Base: str = "BertModel"
     SequenceClf: str = "BertForSequenceClassification"
+    KoELECTRAv3: str = "KoELECTRAv3"
 
 
 @dataclass

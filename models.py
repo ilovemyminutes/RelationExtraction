@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import BertModel, BertConfig, BertForSequenceClassification
+from transformers import BertModel, BertConfig, BertForSequenceClassification, ElectraModel, ElectraTokenizer
 from config import ModelType, Config, ModelType, PreTrainedType
 from dataset import REDataset, split_train_test_loader
 
@@ -15,17 +15,22 @@ def load_model(
 ):
     print("Load Model...", end="\t")
     # make BERT configuration
-    bert_config = BertConfig.from_pretrained(pretrained_type)
-    bert_config.num_labels = num_classes
+    
 
     # load pre-trained model
     if model_type == ModelType.Base:
+        bert_config = BertConfig.from_pretrained(pretrained_type)
+        bert_config.num_labels = num_classes
         model = BertModel.from_pretrained(pretrained_type, config=bert_config)
     elif model_type == ModelType.SequenceClf:
+        bert_config = BertConfig.from_pretrained(pretrained_type)
+        bert_config.num_labels = num_classes
         model = BertForSequenceClassification.from_pretrained(
             pretrained_type, config=bert_config
         )
     elif model_type == ModelType.VanillaBert:
+        bert_config = BertConfig.from_pretrained(pretrained_type)
+        bert_config.num_labels = num_classes
         model = VanillaBert(
             model_type=ModelType.SequenceClf,
             pretrained_type=pretrained_type,
@@ -34,12 +39,17 @@ def load_model(
             dropout=dropout
         )
     elif model_type == ModelType.VanillaBert_v2:
+        bert_config = BertConfig.from_pretrained(pretrained_type)
+        bert_config.num_labels = num_classes
         model = VanillaBert_v2(
             model_type=ModelType.SequenceClf,
             pretrained_type=pretrained_type,
             num_labels=num_classes,
             pooler_idx=pooler_idx
         )
+    elif model_type == ModelType.KoELECTRAv3:
+        model = ElectraModel.from_pretrained("monologg/koelectra-small-v3-discriminator")
+
     else:
         raise NotImplementedError()
 
