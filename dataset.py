@@ -9,7 +9,7 @@ from transformers.utils import logging
 logger = logging.get_logger(__name__)
 from config import Config, PreProcessType
 from utils import load_pickle
-from tokenization import load_tokenizer
+from tokenization import load_tokenizer, tokenize
 from preprocessing import preprocess_text
 
 
@@ -30,49 +30,38 @@ class REDataset(Dataset):
     def __init__(
         self,
         root: str = Config.Train,
-        preprocess_type: str = PreProcessType.Base,
+        preprocess_type: str = PreProcessType.EM,
         device: str = Config.Device,
     ):
-        self.data = self._load_data(root, preprocess_type=preprocess_type)
-        self.tokenizer = load_tokenizer(type=preprocess_type)
-        self.inputs = self._tokenize(self.data)
+        self.data = self._load_preprocessed_data(root, preprocess_type=preprocess_type)
+        self.inputs = self.data["input"].tolist()
         self.labels = self.data["label"].tolist()
+        self.tokenizer = load_tokenizer(type=preprocess_type)
+        self.preprocess_type = preprocess_type
         self.device = device
 
     def __getitem__(self, idx) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
         """모델에 입력할 데이터 생성시, device 상황에 따라 CPU 또는 GPU에 할당한 채로 return"""
-        sentence = {
-            key: torch.as_tensor(val[idx]).to(self.device)  # device 할당
-            for key, val in self.inputs.items()
-        }
+        sentence = tokenize(self.inputs[idx], self.tokenizer, self.preprocess_type)
+
+        for key in sentence.keys():
+            sentence[key] = sentence[key].to(self.device)
+
         label = torch.as_tensor(self.labels[idx]).to(self.device)  # device 할당
         return sentence, label
 
     def __len__(self):
         return len(self.labels)
 
-    def _tokenize(self, data):
-        print("Apply Tokenization...", end="\t")
-        data_tokenized = self.tokenizer(
-            data["input"].tolist(),
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=100,
-            add_special_tokens=True,
-        )
-        print("done!")
-        return data_tokenized
-
     @staticmethod
-    def _load_data(root: str, preprocess_type: str) -> pd.DataFrame:
+    def _load_preprocessed_data(root: str, preprocess_type: str) -> pd.DataFrame:
         enc = LabelEncoder()
         print("Load raw data...", end="\t")
         raw = pd.read_csv(root, sep="\t", header=None)
         raw.columns = COLUMNS
         raw = raw.drop("id", axis=1)
         raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
-        print(f"preprocessing for '{preprocess_type}'...", end="\t")
+        print(f"apply preprocess '{preprocess_type}'...", end="\t")
         data = preprocess_text(raw, method=preprocess_type)
         print("done!")
         return data
@@ -186,6 +175,6 @@ class LabelEncoder:
 
 # just for debug
 if __name__ == "__main__":
-    config_dataset = dict(root=Config.Train, tokenization_type=PreProcessType.Base)
+    config_dataset = dict(root=Config.Train, preprocess_type=PreProcessType.EM)
     dataset = REDataset(**config_dataset)
-    train_loader, valid_loader = split_train_test_loader(dataset)
+    # train_loader, valid_loader = split_train_test_loader(dataset)
