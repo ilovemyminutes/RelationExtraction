@@ -84,3 +84,4 @@ class ModelType:
 class PreTrainedType:
     MultiLingual: str = "bert-base-multilingual-cased"
     BaseUncased: str = "bert-base-uncased"
+    KoELECTRAv3: str = "monologg/koelectra-base-v3-discriminator"

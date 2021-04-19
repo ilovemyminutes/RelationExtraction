@@ -8,7 +8,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
-from config import Config, PreProcessType
+from config import Config, ModelType, PreProcessType
 from utils import load_pickle
 from tokenization import (
     load_tokenizer,
@@ -34,12 +34,13 @@ class REDataset(Dataset):
     def __init__(
         self,
         root: str = Config.Train,
+        model_type: str = ModelType.KoELECTRAv3,
         preprocess_type: str = PreProcessType.EM,
         device: str = Config.Device,
     ):
         self.data = self._load_data(root, preprocess_type=preprocess_type)
         self.labels = self.data["label"].tolist()
-        self.tokenizer = load_tokenizer(type=preprocess_type)
+        self.tokenizer = load_tokenizer(model_type=model_type, preprocess_type=preprocess_type)
         self.inputs = tokenize(
             self.data, self.tokenizer, preprocess_type
         )

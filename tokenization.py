@@ -2,8 +2,8 @@ from tqdm import tqdm
 import pandas as pd
 import torch
 from dataclasses import dataclass
-from transformers import BertTokenizer, AutoTokenizer
-from config import PreProcessType, PreTrainedType
+from transformers import BertTokenizer, ElectraTokenizer
+from config import ModelType, PreProcessType, PreTrainedType
 
 # 토큰화 결과 [CLS] 토큰이 가장 앞에 붙게 되기 떄문에
 # Entity Mark에 대한 임베딩 값을 조절하는 과정에서 인덱스를 OFFSET만큼 밀어주기 위해 사용
@@ -30,7 +30,7 @@ class SpecialToken:
     E2Close: str = "[/E2]"
 
 
-def load_tokenizer(type: str = PreProcessType.Base):
+def load_tokenizer(model_type: str = ModelType.KoELECTRAv3, preprocess_type: str = PreProcessType.Base):
     """사전 학습된 tokenizer를 불러오는 함수
     Args
     ---
@@ -40,25 +40,47 @@ def load_tokenizer(type: str = PreProcessType.Base):
     ---
     - tokenizer(BertTokenizer): 사전 학습된 tokenizer
     """
-    print(f"Load Tokenizer for {type}...", end="\t")
-    if type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
-        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
+    print(f"Load Tokenizer for {preprocess_type}...", end="\t")
+    if model_type in [ModelType.SequenceClf, ModelType.VanillaBert, ModelType.VanillaBert_v2]:
+        if preprocess_type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
+            tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
 
-    # Entity Marker, Entity Marker Separator with Position Embedding
-    elif type == PreProcessType.EM or type == PreProcessType.EMSP:
-        tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
-        tokenizer.add_special_tokens(
-            {
-                "additional_special_tokens": [
-                    SpecialToken.E1Open,
-                    SpecialToken.E1Close,
-                    SpecialToken.E2Open,
-                    SpecialToken.E2Close,
-                ]
-            }
-        )
-    else:
-        raise NotImplementedError
+        # Entity Marker, Entity Marker Separator with Position Embedding
+        elif preprocess_type in [PreProcessType.EM, PreProcessType.EMSP]:
+            tokenizer = BertTokenizer.from_pretrained(PreTrainedType.MultiLingual)
+            tokenizer.add_special_tokens(
+                {
+                    "additional_special_tokens": [
+                        SpecialToken.E1Open,
+                        SpecialToken.E1Close,
+                        SpecialToken.E2Open,
+                        SpecialToken.E2Close,
+                    ]
+                }
+            )
+        else:
+            raise NotImplementedError
+
+    elif model_type == ModelType.KoELECTRAv3:
+        if preprocess_type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
+            tokenizer = ElectraTokenizer.from_pretrained(PreTrainedType.KoELECTRAv3)
+
+        # Entity Marker, Entity Marker Separator with Position Embedding
+        elif preprocess_type in [PreProcessType.EM, PreProcessType.EMSP]:
+            tokenizer = ElectraTokenizer.from_pretrained(PreTrainedType.KoELECTRAv3)
+            tokenizer.add_special_tokens(
+                {
+                    "additional_special_tokens": [
+                        SpecialToken.E1Open,
+                        SpecialToken.E1Close,
+                        SpecialToken.E2Open,
+                        SpecialToken.E2Close,
+                    ]
+                }
+            )
+        else:
+            raise NotImplementedError
+
     print("done!")
     return tokenizer
 

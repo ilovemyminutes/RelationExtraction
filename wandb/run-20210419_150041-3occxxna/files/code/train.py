@@ -80,11 +80,11 @@ def train(
             type=lr_scheduler, optimizer=optimizer, num_training_steps=TOTAL_STEPS
         )
 
-    # # make checkpoint directory to save model during train
-    # checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
-    # if checkpoint_dir not in os.listdir(save_path):
-    #     os.mkdir(os.path.join(save_path, checkpoint_dir))
-    # save_path = os.path.join(save_path, checkpoint_dir)
+    # make checkpoint directory to save model during train
+    checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
+    if checkpoint_dir not in os.listdir(save_path):
+        os.mkdir(os.path.join(save_path, checkpoint_dir))
+    save_path = os.path.join(save_path, checkpoint_dir)
 
     # train phase
     best_acc = 0
@@ -98,7 +98,7 @@ def train(
         total_loss = 0
 
         for sentences, labels in tqdm(train_loader, desc="[Train]"):
-            if model_type in [ModelType.SequenceClf]:
+            if model_type == ModelType.SequenceClf:
                 input_ids = sentences['input_ids']
                 token_type_ids = sentences['token_type_ids']
                 attention_mask = sentences['attention_mask']
@@ -250,7 +250,7 @@ def validate(model, model_type, valid_loader, criterion):
 
     with torch.no_grad():
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
-            if model_type in [ModelType.SequenceClf, ModelType.KoELECTRAv3]:
+            if model_type == ModelType.SequenceClf:
                 input_ids = sentences['input_ids']
                 token_type_ids = sentences['token_type_ids']
                 attention_mask = sentences['attention_mask']
@@ -297,11 +297,11 @@ if __name__ == "__main__":
     parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--epochs", type=int, default=Config.Epochs)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
     parser.add_argument("--valid-batch-size", type=int, default=512)
-    parser.add_argument("--optim-type", type=str, default=Optimizer.AdamW)
-    parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LR)
+    parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
+    parser.add_argument("--loss-type", type=str, default=Loss.LS)
+    parser.add_argument("--lr", type=float, default=Config.LRSlow)
     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     wandb.config.update(args)
 
     # make checkpoint directory to save model during train
-    checkpoint_dir = f"{os.path.basename(args.model_type)}_{os.path.basename(args.pretrained_type)}_{TIMESTAMP}"
+    checkpoint_dir = f"{args.model_type}_{args.pretrained_type}_{TIMESTAMP}"
     if checkpoint_dir not in os.listdir(args.save_path):
         os.mkdir(os.path.join(args.save_path, checkpoint_dir))
     args.save_path = os.path.join(args.save_path, checkpoint_dir)

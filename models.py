@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import BertModel, BertConfig, BertForSequenceClassification, ElectraModel, ElectraTokenizer
+from transformers import BertModel, BertConfig, BertForSequenceClassification, ElectraModel, ElectraConfig
 from config import ModelType, Config, ModelType, PreTrainedType
 from dataset import REDataset, split_train_test_loader
 
@@ -48,7 +48,7 @@ def load_model(
             pooler_idx=pooler_idx
         )
     elif model_type == ModelType.KoELECTRAv3:
-        model = ElectraModel.from_pretrained("monologg/koelectra-small-v3-discriminator")
+        model = VanillaKoElectra(num_classes=num_classes)
 
     else:
         raise NotImplementedError()
@@ -59,6 +59,28 @@ def load_model(
 
     print("done!")
     return model
+
+
+class VanillaKoElectra(nn.Module):
+    def __init__(self, num_classes, pooler_idx: int=0):
+        super(VanillaKoElectra, self).__init__()
+        config = ElectraConfig.from_pretrained(PreTrainedType.KoELECTRAv3)
+        self.backbone = ElectraModel.from_pretrained(PreTrainedType.KoELECTRAv3, config=config)
+        self.linear = nn.Linear(in_features=768, out_features=num_classes)
+        self.idx = pooler_idx
+    
+    def forward(self, input_ids, token_type_ids, attention_mask):
+        x = self.backbone(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask
+            )
+        x = x.last_hidden_state[:, self.idx, :]
+        output = self.linear(x)
+        return output
+    
+    def resize_token_embeddings(self, new_num_tokens: int):
+        self.backbone.resize_token_embeddings(new_num_tokens)
 
 
 class VanillaBert_v2(nn.Module):
