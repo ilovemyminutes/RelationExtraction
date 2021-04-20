@@ -15,7 +15,7 @@ def predict(
     num_classes,
     pooler_idx,
     data_root,
-    tokenization_type,
+    preprocess_type,
     device,
     save_path,
 ):
@@ -28,14 +28,14 @@ def predict(
     model.eval()
 
     # load dataset
-    dataset = REDataset(data_root, tokenization_type, device)
+    dataset = REDataset(data_root, model_type, preprocess_type, device)
     dataloader = DataLoader(dataset, batch_size=512, shuffle=False, drop_last=False)
 
     # inference phase
     pred_list = []
     with torch.no_grad():
         for sentences, _ in tqdm(dataloader, desc="[Inference]"):
-            if model_type == ModelType.SequenceClf:
+            if model_type == ModelType.XLMSequenceClf:
                 outputs = model(**sentences).logits
             elif model_type == ModelType.Base:
                 outputs = model(**sentences).pooler_output
@@ -69,7 +69,7 @@ def get_model_pretrained_type(load_state_dict: str):
 
 
 if __name__ == "__main__":
-    MODELNAME = "BertForSequenceClassification_bert-base-multilingual-cased_20210419121332/BertForSequenceClassification_bert-base-multilingual-cased_ep(16)acc(0.7200)loss(0.0024)id(20210419121332).pth"
+    MODELNAME = "XLMSequenceClf_roberta-base_20210420123153/XLMSequenceClf_roberta-base_ep(13)acc(0.7649)loss(0.0041)id(20210420123153).pth"
     LOAD_STATE_DICT = os.path.join(Config.CheckPoint, MODELNAME)
 
     parser = argparse.ArgumentParser()
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--data-root", type=str, default=Config.Test)
-    parser.add_argument("--tokenization-type", type=str, default=PreProcessType.ES)
+    parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--save-path", type=str, default=Config.SavePath)
     args = parser.parse_args()

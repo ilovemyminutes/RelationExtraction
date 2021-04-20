@@ -8,14 +8,13 @@ from torch.utils.data import DataLoader
 import wandb
 from evaluation import evaluate
 from models import load_model
-from dataset import REDataset, REDataset, split_train_test_loader
+from dataset import REDataset, REDataset, split_train_test_loader, LabelEncoder
 from optimizers import get_optimizer, get_scheduler
 from criterions import get_criterion
 from utils import get_timestamp, get_timestamp, set_seed, verbose, ckpt_name, save_json
 from config import ModelType, Config, Optimizer, PreTrainedType, PreProcessType, Loss
 
 warnings.filterwarnings("ignore")
-# os.environ[ "TF_FORCE_GPU_ALLOW_GROWTH" ] = "true"
 
 TOTAL_SAMPLES = 9000
 
@@ -80,12 +79,6 @@ def train(
             type=lr_scheduler, optimizer=optimizer, num_training_steps=TOTAL_STEPS
         )
 
-    # # make checkpoint directory to save model during train
-    # checkpoint_dir = f"{model_type}_{pretrained_type}_{TIMESTAMP}"
-    # if checkpoint_dir not in os.listdir(save_path):
-    #     os.mkdir(os.path.join(save_path, checkpoint_dir))
-    # save_path = os.path.join(save_path, checkpoint_dir)
-
     # train phase
     best_acc = 0
     best_loss = 999
@@ -104,7 +97,10 @@ def train(
                 attention_mask = sentences['attention_mask']
                 loss, outputs = model(input_ids, token_type_ids, attention_mask, labels=labels).values()
             else:
-                outputs = model(**sentences)
+                if model_type == ModelType.XLMSequenceClf:
+                    outputs = model(**sentences).logits
+                else:
+                    outputs = model(**sentences)
                 loss = criterion(outputs, labels)
                 
             total_loss += loss.item()
@@ -134,7 +130,7 @@ def train(
                 train_eval = evaluate(
                     y_true=true_arr, y_pred=pred_arr
                 )  # ACC, F1, PRC, REC
-                train_loss = total_loss / len(true_arr)
+                train_loss = total_loss / len(train_loader)
 
                 # save logs of train step
                 wandb.log(
@@ -150,20 +146,21 @@ def train(
         true_arr = np.hstack(true_list)
 
         train_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
-        train_loss = total_loss / len(true_arr)
+        train_loss = total_loss / len(train_loader)
 
-        # validation phase
-        valid_eval, valid_loss = validate(
-            model=model,
-            model_type=model_type,
-            valid_loader=valid_loader,
-            criterion=criterion,
-        )
-        verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
-        verbose(phase="Train", eval=train_eval, loss=train_loss)
-
+        
         # logs for each epoch of train, valid both
         if is_valid:  # when train set splited to train/valid
+            # validation phase
+            valid_eval, valid_loss = validate(
+                model=model,
+                model_type=model_type,
+                valid_loader=valid_loader,
+                num_classes=num_classes,
+                criterion=criterion,
+            )
+            verbose(phase="Valid", eval=valid_eval, loss=valid_loss)
+            verbose(phase="Train", eval=train_eval, loss=train_loss)
             wandb.log(
                 {
                     "Train ACC": train_eval["accuracy"],
@@ -175,6 +172,7 @@ def train(
                 }
             )
         else:  # when train set not splited - all train set are feeded to train
+            verbose(phase="Train", eval=train_eval, loss=train_loss)
             wandb.log(
                 {
                     "Train ACC": train_eval["accuracy"],
@@ -242,7 +240,7 @@ def train(
                 print(f"Model saved: {os.path.join(save_path, name)}")
 
 
-def validate(model, model_type, valid_loader, criterion):
+def validate(model, model_type, valid_loader, num_classes, criterion):
     pred_list = []
     true_list = []
     total_loss = 0
@@ -250,13 +248,16 @@ def validate(model, model_type, valid_loader, criterion):
 
     with torch.no_grad():
         for sentences, labels in tqdm(valid_loader, desc="[Valid]"):
-            if model_type in [ModelType.SequenceClf, ModelType.KoELECTRAv3]:
+            if model_type in [ModelType.SequenceClf]:
                 input_ids = sentences['input_ids']
                 token_type_ids = sentences['token_type_ids']
                 attention_mask = sentences['attention_mask']
                 loss, outputs = model(input_ids, token_type_ids, attention_mask, labels=labels).values()
             else:
-                outputs = model(**sentences)
+                if model_type == ModelType.XLMSequenceClf:
+                    outputs = model(**sentences).logits
+                else:
+                    outputs = model(**sentences)
                 loss = criterion(outputs, labels)
                 
             total_loss += loss.item()
@@ -268,12 +269,24 @@ def validate(model, model_type, valid_loader, criterion):
             pred_list.append(preds)
             true_list.append(labels)
 
-        pred_arr = np.hstack(pred_list)
-        true_arr = np.hstack(true_list)
+    pred_arr = np.hstack(pred_list)
+    true_arr = np.hstack(true_list)
 
-        # evaluation phase
-        valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
-        valid_loss = total_loss / len(true_arr)
+    # evaluation phase
+    valid_eval = evaluate(y_true=true_arr, y_pred=pred_arr)  # ACC, F1, PRC, REC
+    valid_loss = total_loss / len(valid_loader)
+
+    # plot confution metrix
+    wandb.log(
+        {
+            "conf_mat": wandb.plot.confusion_matrix(
+                probs=None,
+                y_true=true_arr,
+                preds=pred_arr,
+                class_names=[i for i in range(num_classes)]
+                )
+                }
+                )
 
     model.train()
 
@@ -285,23 +298,23 @@ if __name__ == "__main__":
     LOAD_STATE_DICT = None
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-type", type=str, default=ModelType.KoELECTRAv3)
+    parser.add_argument("--model-type", type=str, default=ModelType.XLMSequenceClf)
     parser.add_argument(
-        "--pretrained-type", type=str, default=PreTrainedType.KoELECTRAv3
+        "--pretrained-type", type=str, default=PreTrainedType.XLMRoberta
     )
-    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
+    parser.add_argument("--num-classes", type=int, default=Config.NumBinary)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--dropout", type=float, default=0.8)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
-    parser.add_argument("--data-root", type=str, default=Config.Train)
+    parser.add_argument("--data-root", type=str, default=Config.TrainBin)
     parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
-    parser.add_argument("--epochs", type=int, default=Config.Epochs)
+    parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch32)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch64)
     parser.add_argument("--valid-batch-size", type=int, default=512)
-    parser.add_argument("--optim-type", type=str, default=Optimizer.AdamW)
+    parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LR)
+    parser.add_argument("--lr", type=float, default=Config.LRFaster)
     parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
@@ -310,6 +323,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.model_type in [ModelType.SequenceClf, ModelType.KoELECTRAv3]:
         args.loss_type = Loss.CE
+    if args.model_type in [ModelType.SequenceClf, ModelType.KoELECTRAv3, ModelType.XLMBase, ModelType.XLMSequenceClf]:
         args.dropout = None
 
     # register logs to wandb

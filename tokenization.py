@@ -1,8 +1,9 @@
+from tokenizers.models import Model
 from tqdm import tqdm
 import pandas as pd
 import torch
 from dataclasses import dataclass
-from transformers import BertTokenizer, ElectraTokenizer
+from transformers import BertTokenizer, ElectraTokenizer, RobertaTokenizer, RobertaForSequenceClassification, RobertaModel
 from config import ModelType, PreProcessType, PreTrainedType
 
 # 토큰화 결과 [CLS] 토큰이 가장 앞에 붙게 되기 떄문에
@@ -18,6 +19,8 @@ class SpecialToken:
     # Basic Special Tokens for BERT
     SEP: str = "[SEP]"
     CLS: str = "[CLS]"
+    SOpen: str = "<s>"
+    SClose: str = "</s>"
 
     # 무엇(entity)은 무엇(entity)과 어떤 관계이다.(순서 고려 X)
     EOpen: str = "[ENT]"
@@ -81,11 +84,29 @@ def load_tokenizer(model_type: str = ModelType.KoELECTRAv3, preprocess_type: str
         else:
             raise NotImplementedError
 
+    elif model_type in [ModelType.XLMSequenceClf, ModelType.XLMBase]:
+        if preprocess_type in [PreProcessType.Base, PreProcessType.ES, PreProcessType.ESP]:
+            tokenizer = RobertaTokenizer.from_pretrained(PreTrainedType.XLMRoberta)
+
+        # Entity Marker, Entity Marker Separator with Position Embedding
+        elif preprocess_type in [PreProcessType.EM, PreProcessType.EMSP]:
+            tokenizer = RobertaTokenizer.from_pretrained(PreTrainedType.XLMRoberta)
+            tokenizer.add_special_tokens(
+                {
+                    "additional_special_tokens": [
+                        SpecialToken.E1Open,
+                        SpecialToken.E1Close,
+                        SpecialToken.E2Open,
+                        SpecialToken.E2Close,
+                    ]
+                }
+            )
+
     print("done!")
     return tokenizer
 
 
-def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
+def tokenize(data: pd.DataFrame, tokenizer, model_type, preprocess_type: str=PreProcessType.Base):
     print("Apply Tokenization...", end="\t")
     data_tokenized = tokenizer(
         data["input"].tolist(),
@@ -95,10 +116,14 @@ def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
         max_length=MAX_LENGTH,
         add_special_tokens=True,
     )
-    if type not in  [PreProcessType.Base, PreProcessType.ES]:
+    if model_type in [ModelType.XLMSequenceClf, ModelType.XLMBase]:
+        print(f'No specific preprocessing for {model_type} yet. Just return tokenized outputs.')
+        return data_tokenized
+        
+    if preprocess_type not in  [PreProcessType.Base, PreProcessType.ES]:
         tokenized_decoded = data["input"].apply(lambda x: tokenizer.tokenize(x))
 
-        if type == PreProcessType.EM:
+        if preprocess_type == PreProcessType.EM:
             # entity marker
             entity_intervals = tokenized_decoded.apply(
                 lambda x: find_entity_intervals(x)
@@ -108,7 +133,7 @@ def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
             )
             data_tokenized["token_type_ids"] += entity_interval_tensor.long()
 
-        elif type == PreProcessType.EMSP:
+        elif preprocess_type == PreProcessType.EMSP:
             # entity marker
             entity_intervals = tokenized_decoded.apply(
                 lambda x: find_entity_intervals(x)
@@ -118,7 +143,7 @@ def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
             )
 
             # entity separation
-            sep_intervals = tokenized_decoded.apply(lambda x: find_sep_intervals(x)).tolist()
+            sep_intervals = tokenized_decoded.apply(lambda x: find_sep_intervals(x, model_type)).tolist()
             sep_interval_tensor = make_additional_token_type_ids(
                 sep_intervals, data_size=data.shape[0], type='sep'
             )
@@ -126,9 +151,9 @@ def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
             data_tokenized["token_type_ids"] += entity_interval_tensor.long()
             data_tokenized["token_type_ids"] += sep_interval_tensor.long()
 
-        elif type == PreProcessType.ESP:
+        elif preprocess_type == PreProcessType.ESP:
             # entity separation
-            sep_intervals = tokenized_decoded.apply(lambda x: find_sep_intervals(x)).tolist()
+            sep_intervals = tokenized_decoded.apply(lambda x: find_sep_intervals(x, model_type)).tolist()
             sep_interval_tensor = make_additional_token_type_ids(
                 sep_intervals, data_size=data.shape[0], type='sep'
             )
@@ -137,35 +162,40 @@ def tokenize(data: pd.DataFrame, tokenizer, type: str=PreProcessType.Base):
     return data_tokenized
 
 
-def find_sep_intervals(tokenized: list) -> list:
-    sep_indices = tuple(idx for idx, tok in enumerate(tokenized) if tok == SpecialToken.SEP)
+def find_sep_intervals(tokenized: list, model_type: str) -> list:
+    if model_type in [ModelType.XLMSequenceClf, ModelType.XLMBase]:
+        sep_indices = tuple(idx for idx, tok in enumerate(tokenized) if tok in [SpecialToken.SOpen, SpecialToken.SClose])
+    else:
+        sep_indices = tuple(idx for idx, tok in enumerate(tokenized) if tok == SpecialToken.SEP)
+
     return sep_indices
 
 
 def find_entity_intervals(tokenized: list) -> dict:
-        entity_intervals = [
-            (tokenized.index(SpecialToken.E1Open), tokenized.index(SpecialToken.E1Close)),
-            (tokenized.index(SpecialToken.E2Open), tokenized.index(SpecialToken.E2Close))
-        ]
-        return entity_intervals
+    entity_intervals = [
+        (tokenized.index(SpecialToken.E1Open), tokenized.index(SpecialToken.E1Close)),
+        (tokenized.index(SpecialToken.E2Open), tokenized.index(SpecialToken.E2Close))
+    ]
+
+    return entity_intervals
 
 def make_additional_token_type_ids(intervals: list, data_size: int, type: str='entity'):
-        n_rows = data_size
-        n_cols = MAX_LENGTH
-        additional_token_type_ids = torch.zeros(n_rows, n_cols)
+    n_rows = data_size
+    n_cols = MAX_LENGTH
+    additional_token_type_ids = torch.zeros(n_rows, n_cols)
 
-        if type == 'entity':
-            for idx, (e1, e2) in tqdm(enumerate(intervals), desc="Update token_type_ids"):
-                additional_token_type_ids[idx][OFFSET+e1[0]: OFFSET+e1[1]+1] += ENTITY_SCORE
-                additional_token_type_ids[idx][OFFSET+e2[0]: OFFSET+e2[1]+1] += ENTITY_SCORE
+    if type == 'entity':
+        for idx, (e1, e2) in tqdm(enumerate(intervals), desc="Update token_type_ids"):
+            additional_token_type_ids[idx][OFFSET+e1[0]: OFFSET+e1[1]+1] += ENTITY_SCORE
+            additional_token_type_ids[idx][OFFSET+e2[0]: OFFSET+e2[1]+1] += ENTITY_SCORE
 
-        elif type == 'sep':
-            for idx, sep in tqdm(enumerate(intervals), desc="Update token_type_ids"):
-                last_sep = sep[-1]
-                additional_token_type_ids[idx][OFFSET: OFFSET+last_sep+1] += SEP_SCORE
-                additional_token_type_ids[idx][OFFSET: OFFSET+last_sep+1] += SEP_SCORE
-                
-        return additional_token_type_ids
+    elif type == 'sep':
+        for idx, sep in tqdm(enumerate(intervals), desc="Update token_type_ids"):
+            last_sep = sep[-1]
+            additional_token_type_ids[idx][OFFSET: OFFSET+last_sep+1] += SEP_SCORE
+            additional_token_type_ids[idx][OFFSET: OFFSET+last_sep+1] += SEP_SCORE
+            
+    return additional_token_type_ids
 
 
 

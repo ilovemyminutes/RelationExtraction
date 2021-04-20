@@ -4,7 +4,7 @@ from typing import Tuple, Dict
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import SubsetRandomSampler, WeightedRandomSampler
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
@@ -30,6 +30,8 @@ COLUMNS = [
 ]
 
 
+
+
 class REDataset(Dataset):
     def __init__(
         self,
@@ -38,11 +40,11 @@ class REDataset(Dataset):
         preprocess_type: str = PreProcessType.EM,
         device: str = Config.Device,
     ):
-        self.data = self._load_data(root, preprocess_type=preprocess_type)
+        self.data = self._load_data(root, model_type=model_type, preprocess_type=preprocess_type)
         self.labels = self.data["label"].tolist()
         self.tokenizer = load_tokenizer(model_type=model_type, preprocess_type=preprocess_type)
         self.inputs = tokenize(
-            self.data, self.tokenizer, preprocess_type
+            self.data, self.tokenizer, model_type, preprocess_type
         )
         self.device = device
 
@@ -59,19 +61,23 @@ class REDataset(Dataset):
         return len(self.labels)
 
     @staticmethod
-    def _load_data(root: str, preprocess_type: str) -> pd.DataFrame:
-
-        # load raw data
+    def _load_data(root: str, model_type: str, preprocess_type: str) -> pd.DataFrame:
+        print(f"Getting dataset for {model_type}...")
         print("Load raw data...", end="\t")
-        enc = LabelEncoder()
-        raw = pd.read_csv(root, sep="\t", header=None)
-        raw.columns = COLUMNS
+
+        if 'preprocessed' in root:
+            raw = pd.read_csv(root)
+        else: # load raw data
+            enc = LabelEncoder()
+            raw = pd.read_csv(root, sep="\t", header=None)
+            raw.columns = COLUMNS
+            raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
+
         raw = raw.drop("id", axis=1)
-        raw["label"] = raw["label"].apply(lambda x: enc.transform(x))
 
         # preprocessing
         print(f"preprocessing for '{preprocess_type}'...", end="\t")
-        data = preprocess_text(raw, method=preprocess_type)
+        data = preprocess_text(raw, model_type=model_type, method=preprocess_type)
         print("done!")
 
         return data
@@ -119,6 +125,7 @@ def split_train_test_loader(
     # train loader
     train_indices = indices[num_test:]
     train_sampler = SubsetRandomSampler(train_indices)
+    
     if drop_last:
         train_loader = DataLoader(
             dataset, sampler=train_sampler, batch_size=train_batch_size, drop_last=True
@@ -171,8 +178,8 @@ def load_data(
 
 
 class LabelEncoder:
-    def __init__(self, meta_root: str = Config.Label):
-        self.encoder = load_pickle(meta_root)
+    def __init__(self):
+        self.encoder = load_pickle(Config.Label)
         self.decoder = {j: i for j, i in self.encoder.items()}
         self.encoder["blind"] = 42
         self.decoder[42] = "blind"
@@ -184,8 +191,22 @@ class LabelEncoder:
         return self.decoder[x]
 
 
+class LabelEncoder41:
+    def __init__(self):
+        self.encoder = load_pickle(Config.Label41)
+        self.decoder = {j: i for j, i in self.encoder.items()}
+
+    def transform(self, x):
+        return self.encoder[x]
+
+    def inverse_transform(self, x):
+        return self.decoder[x]
+
+
+
+
 # just for debug
 if __name__ == "__main__":
     config_dataset = dict(root=Config.Train, preprocess_type=PreProcessType.EM)
-    dataset = REDataset_fix(**config_dataset)
+    dataset = REDataset(**config_dataset)
     # train_loader, valid_loader = split_train_test_loader(dataset)
