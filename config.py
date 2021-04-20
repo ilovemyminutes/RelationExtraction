@@ -65,7 +65,7 @@ class Optimizer:
     SGD: str = "SGD"
     Momentum: str = "Momentum"
     CosineAnnealing: str = "CosineScheduler"
-    LambdaLR = "LambdaLR"
+    LinearWarmUp = "LinearWarmUp"
 
 
 @dataclass

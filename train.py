@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from transformers import get_linear_schedule_with_warmup
 import wandb
 from evaluation import evaluate
 from models import load_model
@@ -75,9 +76,12 @@ def train(
     criterion = get_criterion(type=loss_type)
     optimizer = get_optimizer(model=model, type=optim_type, lr=lr)
     if lr_scheduler is not None:
-        scheduler = get_scheduler(
-            type=lr_scheduler, optimizer=optimizer, num_training_steps=TOTAL_STEPS
-        )
+        if lr_scheduler != Optimizer.LinearWarmUp:
+            scheduler = get_scheduler(
+                type=lr_scheduler, optimizer=optimizer, num_training_steps=TOTAL_STEPS
+            )
+        else:
+            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0, num_training_steps=len(train_loader))
 
     # train phase
     best_acc = 0
@@ -298,24 +302,24 @@ if __name__ == "__main__":
     LOAD_STATE_DICT = None
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-type", type=str, default=ModelType.XLMSequenceClf)
+    parser.add_argument("--model-type", type=str, default=ModelType.KoELECTRAv3)
     parser.add_argument(
-        "--pretrained-type", type=str, default=PreTrainedType.XLMRoberta
+        "--pretrained-type", type=str, default=PreTrainedType.KoELECTRAv3
     )
-    parser.add_argument("--num-classes", type=int, default=Config.NumBinary)
+    parser.add_argument("--num-classes", type=int, default=Config.NumClasses)
     parser.add_argument("--pooler-idx", type=int, default=0)
     parser.add_argument("--dropout", type=float, default=0.8)
     parser.add_argument("--load-state-dict", type=str, default=LOAD_STATE_DICT)
-    parser.add_argument("--data-root", type=str, default=Config.TrainBin)
+    parser.add_argument("--data-root", type=str, default=Config.Train)
     parser.add_argument("--preprocess-type", type=str, default=PreProcessType.ES)
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--valid-size", type=int, default=Config.ValidSize)
-    parser.add_argument("--train-batch-size", type=int, default=Config.Batch64)
+    parser.add_argument("--train-batch-size", type=int, default=Config.Batch8)
     parser.add_argument("--valid-batch-size", type=int, default=512)
     parser.add_argument("--optim-type", type=str, default=Optimizer.Adam)
     parser.add_argument("--loss-type", type=str, default=Loss.CE)
-    parser.add_argument("--lr", type=float, default=Config.LRFaster)
-    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.CosineAnnealing)
+    parser.add_argument("--lr", type=float, default=Config.LRSlow)
+    parser.add_argument("--lr-scheduler", type=str, default=Optimizer.LinearWarmUp)
     parser.add_argument("--device", type=str, default=Config.Device)
     parser.add_argument("--seed", type=int, default=Config.Seed)
     parser.add_argument("--save-path", type=str, default=Config.CheckPoint)
@@ -328,7 +332,7 @@ if __name__ == "__main__":
 
     # register logs to wandb
     name = (
-        args.model_type + "_" + args.pretrained_type + "_" + TIMESTAMP
+        args.model_type + "_" + os.path.basename(args.pretrained_type) + "_" + TIMESTAMP
     )  # save file name: [MODEL-TYPE]_[PRETRAINED-TYPE]_[EPOCH][ACC][LOSS][ID].pth
     run = wandb.init(project="pstage-klue", name=name, reinit=True)
     wandb.config.update(args)

@@ -97,6 +97,24 @@ class VanillaXLMSeqClf(nn.Module):
         self.backbone.resize_token_embeddings(new_num_tokens)
 
 
+class VanillaXLMLarge(nn.Module):
+    def __init__(self, num_classes):
+        super(VanillaXLMLarge, self).__init__()
+        self.backbone = RobertaModel.from_pretrained(PreTrainedType.XLMRoberta)
+        self.linear = nn.Linear(in_features=768, out_features=num_classes)
+
+    def forward(self, input_ids, attention_mask):
+        x = self.backbone(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+        )
+        output = self.linear(x)
+        return output
+
+    def resize_token_embeddings(self, new_num_tokens: int):
+        self.backbone.resize_token_embeddings(new_num_tokens)
+
+
 class VanillaXLMBase(nn.Module):
     def __init__(self, num_classes):
         super(VanillaXLMBase, self).__init__()
