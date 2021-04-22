@@ -38,6 +38,7 @@ def load_test_dataset(dataset_dir, tokenizer):
 
 
 
+
 class RE_Dataset(Dataset):
     def __init__(self, tokenized_dataset, labels):
         self.tokenized_dataset = tokenized_dataset
